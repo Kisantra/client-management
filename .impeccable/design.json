@@ -1,0 +1,329 @@
+{
+  "schemaVersion": 2,
+  "generatedAt": "2026-08-26T00:00:00Z",
+  "title": "Design System: Lembut",
+  "extensions": {
+    "colorMeta": {
+      "primary": {
+        "role": "primary",
+        "displayName": "Deep Teal",
+        "canonical": "#0b7a6c",
+        "dark": "#1cbca7",
+        "contrastOnWhite": "5.23:1",
+        "note": "The only teal permitted to carry text. Every text-bearing teal fill uses it.",
+        "tonalRamp": ["#032220", "#06413a", "#06564c", "#0b7a6c", "#12a594", "#7ecfc3", "#b7e2da", "#e8f6f3"]
+      },
+      "primary-deep": {
+        "role": "primary",
+        "displayName": "Teal Ink",
+        "canonical": "#06564c",
+        "dark": "#9aeadb",
+        "note": "Reading weight of teal: text on tinted teal surfaces, and the far end of the anchor tile gradient.",
+        "tonalRamp": ["#032220", "#04352e", "#06564c", "#0b7a6c", "#12a594", "#7ecfc3", "#b7e2da", "#e8f6f3"]
+      },
+      "primary-soft": {
+        "role": "primary",
+        "displayName": "Teal Tint",
+        "canonical": "#e8f6f3",
+        "dark": "#14302b",
+        "note": "Soft teal surface: quiet chips, positive pills, running-task avatar, empty-state icon plates.",
+        "tonalRamp": ["#032220", "#06413a", "#06564c", "#0b7a6c", "#12a594", "#7ecfc3", "#b7e2da", "#e8f6f3"]
+      },
+      "primary-bright": {
+        "role": "primary",
+        "displayName": "Bright Teal",
+        "canonical": "#12a594",
+        "dark": "#24d6bd",
+        "contrastOnWhite": "3.07:1",
+        "note": "Data-only teal. Shipped usage is hover feedback on a chart bar and nothing else; never carries text, never a resting fill.",
+        "tonalRamp": ["#03302b", "#054a41", "#0b7a6c", "#12a594", "#3fbfae", "#7ecfc3", "#b7e2da", "#e8f6f3"]
+      },
+      "destructive": {
+        "role": "secondary",
+        "displayName": "Alarm Brick",
+        "canonical": "#c1381f",
+        "dark": "#f0705a",
+        "contrastOnWhite": "5.45:1",
+        "note": "The breach color: late, stalled, over capacity. Never decorative, never a whole bar.",
+        "tonalRamp": ["#33100a", "#641c0f", "#8e2917", "#c1381f", "#d95c42", "#ec9483", "#f7cdc4", "#fdece9"]
+      },
+      "destructive-soft": {
+        "role": "secondary",
+        "displayName": "Alarm Wash",
+        "canonical": "#fdece9",
+        "dark": "#33201c",
+        "note": "Tinted bed for brick-red text: late badges and negative pills only.",
+        "tonalRamp": ["#33100a", "#641c0f", "#8e2917", "#c1381f", "#d95c42", "#ec9483", "#f7cdc4", "#fdece9"]
+      },
+      "info": {
+        "role": "tertiary",
+        "displayName": "Cool Slate",
+        "canonical": "#2f5c88",
+        "dark": "#8bb7e4",
+        "note": "The settled/completed state, so 'done' does not read as a second success color. Used by the done task badge only.",
+        "tonalRamp": ["#0d1926", "#17304a", "#21456a", "#2f5c88", "#567fa8", "#8fadc9", "#c4d6e8", "#edf3fb"]
+      },
+      "ink-panel": {
+        "role": "tertiary",
+        "displayName": "Deep Ink Panel",
+        "canonical": "#0f1a18",
+        "dark": "#08110f",
+        "note": "Stays dark in both themes. One dark plate inside the light sidebar rail: the integration prompt.",
+        "tonalRamp": ["#05100e", "#0a1614", "#0f1a18", "#17241f", "#33413d", "#64716d", "#b9c4c0", "#e9f1ee"]
+      },
+      "background": {
+        "role": "neutral",
+        "displayName": "Cool Paper",
+        "canonical": "#f7f9f8",
+        "dark": "#0c1513",
+        "note": "The page ground, also painted on html before first paint so the theme never flashes white.",
+        "tonalRamp": ["#101a17", "#33413d", "#64716d", "#9aa5a1", "#dde5e3", "#e6ecea", "#f1f5f4", "#f7f9f8"]
+      },
+      "card": {
+        "role": "neutral",
+        "displayName": "Panel White",
+        "canonical": "#ffffff",
+        "dark": "#111c19",
+        "note": "Every panel, stat tile, and placeholder card.",
+        "tonalRamp": ["#101a17", "#33413d", "#64716d", "#9aa5a1", "#dde5e3", "#e6ecea", "#f1f5f4", "#ffffff"]
+      },
+      "foreground": {
+        "role": "neutral",
+        "displayName": "Deep Pine Ink",
+        "canonical": "#101a17",
+        "dark": "#e9f1ee",
+        "note": "Body and heading text, the chart tooltip fill, and the tint source for every neutral shadow.",
+        "tonalRamp": ["#101a17", "#1c2b27", "#33413d", "#64716d", "#9aa5a1", "#dde5e3", "#f1f5f4", "#f7f9f8"]
+      },
+      "secondary-foreground": {
+        "role": "neutral",
+        "displayName": "Slate Text",
+        "canonical": "#33413d",
+        "dark": "#d3e0dc",
+        "note": "Row labels, sidebar nav text, filled slots in the team-load meter.",
+        "tonalRamp": ["#101a17", "#1c2b27", "#33413d", "#64716d", "#9aa5a1", "#dde5e3", "#f1f5f4", "#f7f9f8"]
+      },
+      "muted-foreground": {
+        "role": "neutral",
+        "displayName": "Muted Text",
+        "canonical": "#64716d",
+        "dark": "#93a5a0",
+        "contrastOnWhite": "5.09:1",
+        "note": "Secondary lines, column heads, metadata. Never lighter than this.",
+        "tonalRamp": ["#101a17", "#1c2b27", "#33413d", "#64716d", "#9aa5a1", "#dde5e3", "#f1f5f4", "#f7f9f8"]
+      },
+      "neutral-soft": {
+        "role": "neutral",
+        "displayName": "Quiet Surface",
+        "canonical": "#f1f5f4",
+        "dark": "#17241f",
+        "note": "The recessed neutral: search field, header icon buttons, meta chips, unfilled meter slots, every bar track.",
+        "tonalRamp": ["#101a17", "#33413d", "#64716d", "#9aa5a1", "#dde5e3", "#e6ecea", "#f1f5f4", "#f7f9f8"]
+      },
+      "border": {
+        "role": "neutral",
+        "displayName": "Hairline",
+        "canonical": "#e6ecea",
+        "dark": "#1f2d29",
+        "note": "The only separation stroke in the system. 1px, never heavier, never colored.",
+        "tonalRamp": ["#101a17", "#33413d", "#64716d", "#9aa5a1", "#dde5e3", "#e6ecea", "#f1f5f4", "#f7f9f8"]
+      },
+      "chart-2": {
+        "role": "primary",
+        "displayName": "Teal Mid",
+        "canonical": "#7ecfc3",
+        "dark": "#157e71",
+        "note": "Second depth in the single-hue chart ramp. Non-focal data marks.",
+        "tonalRamp": ["#032220", "#06413a", "#06564c", "#0b7a6c", "#12a594", "#7ecfc3", "#b7e2da", "#e8f6f3"]
+      },
+      "chart-4": {
+        "role": "primary",
+        "displayName": "Teal Ghost",
+        "canonical": "#e2efec",
+        "dark": "#1a2f2b",
+        "note": "Faintest depth in the chart ramp. Older periods in the twelve-month bar chart.",
+        "tonalRamp": ["#032220", "#06413a", "#06564c", "#0b7a6c", "#12a594", "#7ecfc3", "#b7e2da", "#e2efec"]
+      }
+    },
+    "typographyMeta": {
+      "figure": { "displayName": "Figure", "purpose": "Stat tile values. The largest type in the system; always tabular." },
+      "headline": { "displayName": "Headline", "purpose": "Page greeting and module titles. One per screen." },
+      "title": { "displayName": "Title", "purpose": "Panel headings. Close to body size; weight does the separating." },
+      "body": { "displayName": "Body", "purpose": "Page subhead, descriptions, empty-state copy. Capped near 34ch in empty states." },
+      "row": { "displayName": "Row", "purpose": "Primary text of a list row or table cell: task title, channel name, pipeline stage." },
+      "control": { "displayName": "Control", "purpose": "Button and control text." },
+      "caption": { "displayName": "Caption", "purpose": "Secondary line under a row, tile captions, meter status." },
+      "label": { "displayName": "Label", "purpose": "Structural micro-labels only: column heads, badges, pills, sidebar group labels. Never an eyebrow above a heading." }
+    },
+    "shadows": [
+      {
+        "name": "lift",
+        "value": "0 1px 2px rgb(16 26 23 / 0.05), 0 1px 3px rgb(16 26 23 / 0.04)",
+        "purpose": "Every resting white surface: panels, plain stat tiles, module placeholder card, chart tooltip. Tinted from the ink, never black."
+      },
+      {
+        "name": "teal",
+        "value": "0 4px 12px rgb(11 122 108 / 0.3)",
+        "purpose": "Under small solid Deep Teal fills: the primary button and the logo tile. Tint derived from #0b7a6c itself."
+      },
+      {
+        "name": "teal-lg",
+        "value": "0 8px 22px rgb(6 86 76 / 0.34)",
+        "purpose": "The anchor stat tile only. Tint derived from #06564c, the darker end of its own gradient."
+      }
+    ],
+    "motion": [
+      {
+        "name": "settle-in",
+        "value": "settle-in 520ms cubic-bezier(0.16, 1, 0.3, 1) backwards",
+        "purpose": "The one authored moment: page content settles in from 55% opacity and a 6px offset, already visible at frame one. Removed under prefers-reduced-motion."
+      },
+      {
+        "name": "state-color",
+        "value": "transition-colors 150-200ms",
+        "purpose": "All state feedback: chart bar hover, tooltip fade, nav and row hover tints, button fills. Nothing moves on hover."
+      }
+    ],
+    "breakpoints": [
+      { "name": "sm", "value": "640px" },
+      { "name": "md", "value": "768px" },
+      { "name": "xl", "value": "1280px" }
+    ],
+    "shell": [
+      { "name": "sidebar-width", "value": "16rem" },
+      { "name": "sidebar-width-icon", "value": "3rem" },
+      { "name": "sidebar-width-mobile", "value": "18rem" },
+      { "name": "header-height", "value": "4rem, tightening to 3.5rem when the sidebar is collapsed" }
+    ]
+  },
+  "components": [
+    {
+      "name": "Primary Button",
+      "kind": "button",
+      "refersTo": "button-primary",
+      "description": "The page's single most-wanted action. Deep teal, teal-tinted shadow, one per screen.",
+      "html": "<button class=\"ds-btn-primary\"><svg viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"2\" stroke-linecap=\"round\" stroke-linejoin=\"round\" aria-hidden=\"true\"><path d=\"M5 12h14\"/><path d=\"M12 5v14\"/></svg>Tambah Lead</button>",
+      "css": ".ds-btn-primary { display: inline-flex; align-items: center; justify-content: center; gap: 8px; height: 40px; padding: 0 24px; border: none; border-radius: 11px; background: var(--primary, #0b7a6c); color: var(--primary-foreground, #fff); font-family: Manrope, ui-sans-serif, system-ui, sans-serif; font-size: 0.875rem; font-weight: 500; white-space: nowrap; cursor: pointer; box-shadow: 0 4px 12px rgb(11 122 108 / 0.3); transition: background-color 200ms, box-shadow 200ms; } .ds-btn-primary svg { width: 16px; height: 16px; flex-shrink: 0; } .ds-btn-primary:hover { background: rgb(11 122 108 / 0.9); } .ds-btn-primary:focus-visible { outline: none; box-shadow: 0 4px 12px rgb(11 122 108 / 0.3), 0 0 0 3px rgb(11 122 108 / 0.5); } .ds-btn-primary:active { background: var(--primary-deep, #06564c); }"
+    },
+    {
+      "name": "Outline Button",
+      "kind": "button",
+      "refersTo": "button-outline",
+      "description": "The secondary action beside the primary. Hover swaps into the teal tint rather than darkening the neutral.",
+      "html": "<button class=\"ds-btn-outline\"><svg viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"1.75\" stroke-linecap=\"round\" stroke-linejoin=\"round\" aria-hidden=\"true\"><path d=\"M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4\"/><path d=\"M17 8l-5-5-5 5\"/><path d=\"M12 3v12\"/></svg>Import Data</button>",
+      "css": ".ds-btn-outline { display: inline-flex; align-items: center; justify-content: center; gap: 8px; height: 40px; padding: 0 24px; border: 1px solid var(--input, #dde5e3); border-radius: 11px; background: var(--background, #f7f9f8); color: var(--foreground, #101a17); font-family: Manrope, ui-sans-serif, system-ui, sans-serif; font-size: 0.875rem; font-weight: 500; white-space: nowrap; cursor: pointer; transition: background-color 200ms, color 200ms; } .ds-btn-outline svg { width: 16px; height: 16px; flex-shrink: 0; } .ds-btn-outline:hover { background: var(--primary-soft, #e8f6f3); color: var(--primary-deep, #06564c); } .ds-btn-outline:focus-visible { outline: none; border-color: var(--ring, #0b7a6c); box-shadow: 0 0 0 3px rgb(11 122 108 / 0.5); }"
+    },
+    {
+      "name": "Panel",
+      "kind": "card",
+      "refersTo": "panel",
+      "description": "The workhorse container. Every dashboard region is one of these: title left, action or meta chip right, hairline-separated footer when present.",
+      "html": "<section class=\"ds-panel\"><header class=\"ds-panel-head\"><h2 class=\"ds-panel-title\">Lead per bulan</h2><span class=\"ds-panel-meta\">12 bulan terakhir</span></header><div class=\"ds-panel-body\">Isi panel.</div><div class=\"ds-panel-foot\">Ringkasan tahap</div></section>",
+      "css": ".ds-panel { display: flex; flex-direction: column; overflow: hidden; border: 1px solid var(--border, #e6ecea); border-radius: 18px; background: var(--card, #fff); color: var(--foreground, #101a17); padding: 20px; box-shadow: 0 1px 2px rgb(16 26 23 / 0.05), 0 1px 3px rgb(16 26 23 / 0.04); font-family: Manrope, ui-sans-serif, system-ui, sans-serif; } .ds-panel-head { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-bottom: 16px; } .ds-panel-title { margin: 0; font-size: 1rem; font-weight: 800; letter-spacing: -0.02em; } .ds-panel-meta { flex-shrink: 0; border-radius: 9999px; background: var(--neutral-soft, #f1f5f4); padding: 4px 10px; font-size: 0.75rem; font-weight: 600; color: var(--muted-foreground, #64716d); } .ds-panel-body { min-height: 0; font-size: 0.875rem; } .ds-panel-foot { margin-top: auto; border-top: 1px solid var(--border, #e6ecea); padding-top: 16px; font-size: 0.8438rem; }"
+    },
+    {
+      "name": "Anchor Stat Tile",
+      "kind": "card",
+      "refersTo": "stat-tile-anchor",
+      "description": "One per stat row and the only gradient in the system. Carries the composition's weight; its caption always holds the counterweight.",
+      "html": "<article class=\"ds-tile-anchor\"><header class=\"ds-tile-head\"><span class=\"ds-tile-label\">Total Lead</span><span class=\"ds-tile-icon\"><svg viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"1.75\" stroke-linecap=\"round\" stroke-linejoin=\"round\" aria-hidden=\"true\"><path d=\"M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2\"/><circle cx=\"9\" cy=\"7\" r=\"4\"/><path d=\"M22 21v-2a4 4 0 0 0-3-3.87\"/><path d=\"M16 3.13a4 4 0 0 1 0 7.75\"/></svg></span></header><p class=\"ds-tile-figure\">148</p><p class=\"ds-tile-caption\"><span class=\"ds-pill-anchor\">+12%</span>dari Juli</p></article>",
+      "css": ".ds-tile-anchor { min-width: 0; border: 1px solid transparent; border-radius: 18px; padding: 18px; background: linear-gradient(150deg, var(--primary, #0b7a6c), var(--primary-deep, #06564c)); color: #fff; box-shadow: 0 8px 22px rgb(6 86 76 / 0.34); font-family: Manrope, ui-sans-serif, system-ui, sans-serif; } .ds-tile-head { display: flex; align-items: flex-start; justify-content: space-between; gap: 12px; margin-bottom: 12px; } .ds-tile-label { display: flex; align-items: center; min-height: 32px; font-size: 0.8125rem; font-weight: 600; line-height: 1.15; } .ds-tile-icon { display: grid; place-items: center; width: 32px; height: 32px; flex-shrink: 0; border-radius: 11px; background: rgb(255 255 255 / 0.25); } .ds-tile-icon svg { width: 16px; height: 16px; } .ds-tile-figure { margin: 0; font-size: 1.875rem; font-weight: 800; line-height: 1; letter-spacing: -0.035em; font-variant-numeric: tabular-nums; } .ds-tile-caption { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; margin: 10px 0 0; font-size: 0.75rem; } .ds-pill-anchor { display: inline-flex; align-items: center; border-radius: 9999px; background: #fff; color: var(--primary, #0b7a6c); padding: 2px 8px; font-size: 0.6875rem; font-weight: 800; }"
+    },
+    {
+      "name": "Pipeline Row",
+      "kind": "custom",
+      "refersTo": "panel",
+      "description": "The signature pattern: one bar shows both the size of a stage and the portion of it that has stopped moving. Red is a segment inside the teal bar, never the whole bar.",
+      "html": "<a class=\"ds-stage\" href=\"#\"><span class=\"ds-stage-label\">Proposal</span><span class=\"ds-stage-track\"><span class=\"ds-stage-fill\" style=\"width:62%\"><span class=\"ds-stage-live\"></span><span class=\"ds-stage-stalled\" style=\"width:24%\"></span></span></span><span class=\"ds-stage-count\">31</span><span class=\"ds-stage-stall\">7 diam &gt;14h</span></a>",
+      "css": ".ds-stage { display: flex; align-items: center; gap: 12px; margin: 0 -8px; padding: 4px 8px; border-radius: 11px; text-decoration: none; color: inherit; font-family: Manrope, ui-sans-serif, system-ui, sans-serif; font-size: 0.8125rem; transition: background-color 200ms; } .ds-stage:hover { background: var(--neutral-soft, #f1f5f4); } .ds-stage:focus-visible { outline: 2px solid var(--ring, #0b7a6c); outline-offset: 2px; } .ds-stage-label { width: 76px; flex-shrink: 0; font-weight: 700; color: var(--secondary-foreground, #33413d); } .ds-stage-track { height: 10px; min-width: 0; flex: 1; overflow: hidden; border-radius: 9999px; background: var(--neutral-soft, #f1f5f4); } .ds-stage-fill { display: flex; height: 100%; overflow: hidden; border-radius: 9999px; } .ds-stage-live { height: 100%; flex: 1; background: var(--primary, #0b7a6c); } .ds-stage-stalled { height: 100%; flex-shrink: 0; background: var(--destructive, #c1381f); } .ds-stage-count { width: 36px; flex-shrink: 0; text-align: right; font-weight: 800; font-variant-numeric: tabular-nums; } .ds-stage-stall { width: 104px; flex-shrink: 0; text-align: right; font-size: 0.75rem; font-weight: 600; color: var(--destructive, #c1381f); }"
+    },
+    {
+      "name": "Task Row",
+      "kind": "custom",
+      "refersTo": "pill-late",
+      "description": "A dense list row: initials plate tinted by state, two-line body that truncates, state badge on the right. A late row shows the time instead of the word.",
+      "html": "<li class=\"ds-task\"><span class=\"ds-task-avatar\">RA</span><span class=\"ds-task-body\"><span class=\"ds-task-title\">Reels: update PPh 21 terbaru</span><span class=\"ds-task-meta\">Instagram &middot; Rani &middot; tertahan di Review</span></span><span class=\"ds-task-badge\">09:30</span></li>",
+      "css": ".ds-task { display: flex; align-items: center; gap: 12px; padding: 10px 0; border-bottom: 1px solid var(--border, #e6ecea); list-style: none; font-family: Manrope, ui-sans-serif, system-ui, sans-serif; } .ds-task:last-child { border-bottom: 0; } .ds-task-avatar { display: grid; place-items: center; width: 36px; height: 36px; flex-shrink: 0; border-radius: 11px; background: var(--destructive-soft, #fdece9); color: var(--destructive, #c1381f); font-size: 0.75rem; font-weight: 800; } .ds-task-body { min-width: 0; flex: 1; } .ds-task-title { display: block; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 0.8438rem; font-weight: 700; line-height: 1.35; } .ds-task-meta { display: block; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 0.75rem; color: var(--muted-foreground, #64716d); } .ds-task-badge { flex-shrink: 0; border-radius: 9999px; background: var(--destructive-soft, #fdece9); color: var(--destructive, #c1381f); padding: 4px 10px; font-size: 0.6875rem; font-weight: 800; white-space: nowrap; font-variant-numeric: tabular-nums; }"
+    },
+    {
+      "name": "Search Field",
+      "kind": "input",
+      "refersTo": "input-search",
+      "description": "The header search. A recessed quiet block with a leading icon; focus raises a ring without changing size or fill.",
+      "html": "<label class=\"ds-search\"><svg viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"1.75\" stroke-linecap=\"round\" stroke-linejoin=\"round\" aria-hidden=\"true\"><circle cx=\"11\" cy=\"11\" r=\"8\"/><path d=\"m21 21-4.3-4.3\"/></svg><input type=\"search\" placeholder=\"Cari lead, client, atau konten…\"></label>",
+      "css": ".ds-search { display: flex; align-items: center; gap: 10px; max-width: 21rem; border-radius: 11px; background: var(--neutral-soft, #f1f5f4); padding: 10px 14px; color: var(--muted-foreground, #64716d); transition: box-shadow 200ms; font-family: Manrope, ui-sans-serif, system-ui, sans-serif; } .ds-search svg { width: 16px; height: 16px; flex-shrink: 0; } .ds-search input { min-width: 0; flex: 1; border: 0; background: transparent; outline: none; color: var(--foreground, #101a17); font: inherit; font-size: 0.8438rem; } .ds-search input::placeholder { color: var(--muted-foreground, #64716d); } .ds-search:focus-within { box-shadow: 0 0 0 2px rgb(11 122 108 / 0.5); }"
+    },
+    {
+      "name": "Sidebar Nav Item",
+      "kind": "nav",
+      "refersTo": "nav-item-active",
+      "description": "A 40px nav row with a 1.75-stroke icon and a count badge. Active takes the teal tint and flips its badge to solid deep teal.",
+      "html": "<nav class=\"ds-nav\"><span class=\"ds-nav-group\">Menu</span><a class=\"ds-nav-item is-active\" href=\"#\"><svg viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"1.75\" stroke-linecap=\"round\" stroke-linejoin=\"round\" aria-hidden=\"true\"><rect x=\"3\" y=\"3\" width=\"7\" height=\"7\" rx=\"1\"/><rect x=\"14\" y=\"3\" width=\"7\" height=\"7\" rx=\"1\"/><rect x=\"14\" y=\"14\" width=\"7\" height=\"7\" rx=\"1\"/><rect x=\"3\" y=\"14\" width=\"7\" height=\"7\" rx=\"1\"/></svg><span>Leads</span><span class=\"ds-nav-badge\">148</span></a><a class=\"ds-nav-item\" href=\"#\"><svg viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"1.75\" stroke-linecap=\"round\" stroke-linejoin=\"round\" aria-hidden=\"true\"><rect x=\"2\" y=\"7\" width=\"20\" height=\"14\" rx=\"2\"/><path d=\"M16 21V5a2 2 0 0 0-2-2h-4a2 2 0 0 0-2 2v16\"/></svg><span>Client</span><span class=\"ds-nav-badge\">43</span></a></nav>",
+      "css": ".ds-nav { display: flex; flex-direction: column; gap: 2px; width: 15rem; padding: 8px; background: #fff; font-family: Manrope, ui-sans-serif, system-ui, sans-serif; } .ds-nav-group { padding: 6px 8px; font-size: 0.6563rem; font-weight: 700; letter-spacing: 0.13em; text-transform: uppercase; color: var(--muted-foreground, #64716d); } .ds-nav-item { display: flex; align-items: center; gap: 10px; height: 40px; padding: 0 8px; border-radius: 11px; text-decoration: none; color: var(--secondary-foreground, #33413d); font-size: 0.875rem; font-weight: 600; transition: background-color 200ms, color 200ms; } .ds-nav-item svg { width: 16px; height: 16px; flex-shrink: 0; } .ds-nav-item:hover { background: var(--neutral-soft, #f1f5f4); } .ds-nav-item:focus-visible { outline: 2px solid var(--ring, #0b7a6c); outline-offset: 2px; } .ds-nav-item.is-active { background: var(--primary-soft, #e8f6f3); color: var(--primary-deep, #06564c); } .ds-nav-badge { margin-left: auto; border-radius: 9999px; background: var(--neutral-soft, #f1f5f4); color: var(--muted-foreground, #64716d); padding: 1px 8px; font-size: 0.6875rem; font-weight: 800; font-variant-numeric: tabular-nums; } .ds-nav-item.is-active .ds-nav-badge { background: var(--primary, #0b7a6c); color: #fff; }"
+    },
+    {
+      "name": "State Pills",
+      "kind": "chip",
+      "refersTo": "pill-positive",
+      "description": "The three-tier chip vocabulary: teal tint for healthy, alarm wash for a breach, quiet surface for neutral metadata.",
+      "html": "<span class=\"ds-pill ds-pill-positive\">+12%</span> <span class=\"ds-pill ds-pill-late\">lead mandek</span> <span class=\"ds-pill ds-pill-quiet\">Data contoh</span>",
+      "css": ".ds-pill { display: inline-flex; align-items: center; gap: 2px; border-radius: 9999px; padding: 4px 10px; font-family: Manrope, ui-sans-serif, system-ui, sans-serif; font-size: 0.6875rem; font-weight: 800; white-space: nowrap; } .ds-pill-positive { background: var(--primary-soft, #e8f6f3); color: var(--primary-deep, #06564c); } .ds-pill-late { background: var(--destructive-soft, #fdece9); color: var(--destructive, #c1381f); } .ds-pill-quiet { background: var(--neutral-soft, #f1f5f4); color: var(--secondary-foreground, #33413d); letter-spacing: 0.06em; text-transform: uppercase; }"
+    },
+    {
+      "name": "Capacity Meter",
+      "kind": "custom",
+      "refersTo": "panel",
+      "description": "Discrete slots instead of a continuous bar, so 'one task over capacity' is countable. Slots past capacity turn brick red.",
+      "html": "<span class=\"ds-meter\" role=\"img\" aria-label=\"9 dari kapasitas 8 tugas\"><i class=\"is-filled\"></i><i class=\"is-filled\"></i><i class=\"is-filled\"></i><i class=\"is-filled\"></i><i class=\"is-filled\"></i><i class=\"is-filled\"></i><i class=\"is-filled\"></i><i class=\"is-filled\"></i><i class=\"is-over\"></i></span>",
+      "css": ".ds-meter { display: inline-flex; gap: 3px; } .ds-meter i { width: 9px; height: 18px; border-radius: 4px; background: var(--neutral-soft, #f1f5f4); } .ds-meter i.is-filled { background: var(--secondary-foreground, #33413d); } .ds-meter i.is-over { background: var(--destructive, #c1381f); }"
+    }
+  ],
+  "narrative": {
+    "northStar": "The Quiet Ledger",
+    "overview": "Lembut is a workspace that behaves like a well-kept ledger rather than a dashboard: cool paper underneath, white pages laid on it, a hairline ruled between every entry, and one column of ink that means this matters today. It is built for a team that opens the app at 9am to find out what it owes and what has already slipped, and it is judged on how pleasant and legible it is at that moment, never on how clever its concept is.\n\nThe world refuses the floating card grid on gray where every figure is an island. Figures here are always paired with the quantity they are measured against, panels sit on a cool-neutral ground rather than float above a dead one, and the loudest mass on the screen is a single teal tile that anchors the composition instead of a scattering of colored accents. Density is high — hundreds of leads a month is the normal state, not the extreme — but the rhythm is generous enough that nothing reads as cramped: 14px base radii, 20px panel padding, and 10-12px row gaps do the softening that a smaller radius and tighter gutters would have taken away.\n\nDepth is deliberate and shallow. Surfaces lift by one or two pixels of tinted, offset shadow; nothing glows, nothing floats, and no border ever exceeds a hairline. Color is rationed to two jobs: teal is the product's voice and brick red is the breach signal. Everything else is a cool neutral doing structural work.",
+    "keyCharacteristics": [
+      "Cool-neutral ground with white surfaces and 1px hairline borders — no gray card grid, no heavy rules.",
+      "Two teals with a hard division of labour: the deep one carries text, the bright one never does.",
+      "Red is the breach color — late, stalled, over capacity — and is never decorative.",
+      "Every figure carries its counterweight; a bare number is an unfinished number.",
+      "Manrope from 400 to 800, with tabular figures in every data column.",
+      "Browser surfaces — selection, caret, focus ring, scrollbars, accent-color — are themed from the palette, not inherited from the browser."
+    ],
+    "rules": [
+      { "name": "The Two Teals Rule", "body": "Deep Teal carries every fill that has text on it and clears 4.5:1. Bright Teal is a data color: it may fill a mark, never a text-bearing surface, and in this build it appears only on hover. If a new surface needs teal behind words, it uses Deep Teal or Teal Ink — never Bright Teal at any opacity.", "section": "colors" },
+      { "name": "The Red Means Breach Rule", "body": "Brick red marks something that has crossed a line: late, stalled, over capacity. It never marks a negative delta, a destructive-looking action, or a decorative accent, and it never fills a whole bar — a pipeline bar shows the stalled share as a red segment inside the teal bar so size and trouble read in one glance. The one non-breach use in the build is the 7px unread dot on the notification button; treat that as the exception, not the licence.", "section": "colors" },
+      { "name": "The Counterweight Rule", "body": "No figure ships alone. Every number is rendered next to the quantity it is measured against — published against target, assigned against capacity, leads against content published, stage count against stalled count. A tile that has only a big number and a label is not finished.", "section": "colors" },
+      { "name": "The Tight-Ramp Rule", "body": "The whole ramp spans 0.6875rem to 1.875rem — under 3x. Hierarchy comes from weight (800 against 700 against 400) and from negative tracking on the heavy end, not from scale jumps. If a new heading needs to feel bigger, raise its weight before its size.", "section": "typography" },
+      { "name": "The Tabular Column Rule", "body": "Figures in a data surface never reflow as their value changes. font-variant-numeric: tabular-nums is applied globally to table and to anything marked [data-numeric]; every number that sits in a column, a badge, or a stat tile carries that attribute.", "section": "typography" },
+      { "name": "The Uppercase-Is-Structural Rule", "body": "Uppercase with positive tracking is reserved for structural micro-labels — column heads, group labels, state badges. It is never used above a heading as an eyebrow.", "section": "typography" },
+      { "name": "The No-Sideways-Scroll Rule", "body": "The page never scrolls horizontally. Wide content owns its own scroll: the twelve-month chart and the channel table each sit in an overflow-x-auto container with a min-width floor (26rem and 22rem), the content pane is overflow-x-clip, and every flex row holding a truncating label carries min-w-0.", "section": "layout" },
+      { "name": "The Two-Line Label Rule", "body": "In the stat row below xl, the label slot reserves a fixed minimum height so a wrapping two-word label cannot knock its row-mate's figure off the shared baseline.", "section": "layout" },
+      { "name": "The Tinted Shadow Rule", "body": "A shadow is tinted from the thing it falls from — ink under neutral surfaces, the exact teal under teal surfaces — and always carries both an offset and a blur. A zero-offset colored halo is decoration, not depth, and black shadows are never used on this cool ground. When a fill color changes, its shadow tint is re-derived from the new value.", "section": "elevation" },
+      { "name": "The Hairline Rule", "body": "One pixel, one color, no exceptions. No rule is thicker than 1px, no card gets a colored left or right edge, and no divider is a shade darker for emphasis — if something needs more separation, it gets more space, not a heavier line.", "section": "shapes" },
+      { "name": "The Meter Silhouette Rule", "body": "Quantities against a maximum are drawn as a fully-rounded track holding a fully-rounded fill, and that fill is subdivided rather than recolored when part of it is in trouble. Discrete counts (team capacity) use a row of 9x18px slots instead of a continuous bar, so one task over is countable rather than estimated.", "section": "shapes" },
+      { "name": "The Nothing-Ships-Default Rule", "body": "Selection, caret, focus ring, both scrollbar APIs, accent-color, color-scheme, underline offset, and tabular figures are all set from the palette in the base layer. A new surface inherits them; it never re-specifies them locally, and it never leaves one at the browser default.", "section": "components" }
+    ],
+    "dos": [
+      "Do put text on Deep Teal (#0b7a6c) or Teal Ink (#06564c) only. Bright Teal (#12a594) is 3.07:1 on white and fills data marks or hover states, nothing else.",
+      "Do give every figure its counterweight in the same breath — value against target, assigned against capacity, count against stalled.",
+      "Do mark tabular numbers with [data-numeric] (or put them in a table) so they never reflow as they update.",
+      "Do wrap any content wider than its column in its own overflow-x-auto container with a min-width floor, and keep min-w-0 on the flex rows around it.",
+      "Do tint shadows from the surface they fall from, with both an offset and a blur; re-derive the tint whenever the fill color changes.",
+      "Do separate with one 1px Hairline or with space — those are the only two options.",
+      "Do carry hierarchy with weight (400 / 500 / 700 / 800) and negative tracking before reaching for a larger size.",
+      "Do label sample data on screen wherever it appears until real data is connected."
+    ],
+    "donts": [
+      "Don't turn a whole element red to signal trouble. Red is a segment, a badge, or a word inside an otherwise normal component — the shape of the thing must still show its size.",
+      "Don't use red for anything but a breach: not for negative deltas, not for delete affordances styled as alarms, not as an accent.",
+      "Don't ship a bare stat: a big number with a small label and nothing to measure it against is the template this world was built to refuse.",
+      "Don't float white cards on a gray page. The ground is cool-neutral, surfaces are white, and the shadow is one or two pixels — not a drop-shadow grid.",
+      "Don't add a second gradient. The anchor tile is the only one; a second destroys the single centre of gravity.",
+      "Don't put a kicker or eyebrow above a heading. Uppercase micro-type is for column heads, group labels, and state badges only.",
+      "Don't exceed 1px on any border, and never add a colored left or right edge to a card, row, or callout.",
+      "Don't introduce a monospace face for a technical feeling; tabular Manrope already handles every number in the product.",
+      "Don't substitute a Unicode glyph or emoji for an icon. Icons are Lucide at 1.75 stroke, 16px in dense rows and 20-24px on plates.",
+      "Don't re-theme selection, caret, focus ring, or scrollbars per component; they are set once in the base layer."
+    ]
+  }
+}

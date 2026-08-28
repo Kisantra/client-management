@@ -1,0 +1,414 @@
+@import 'tailwindcss';
+
+@import 'tw-animate-css';
+
+@source '../views';
+@source '../../vendor/laravel/framework/src/Illuminate/Pagination/resources/views/*.blade.php';
+
+@custom-variant dark (&:is(.dark *));
+
+@theme {
+    --font-sans:
+        'Manrope', ui-sans-serif, system-ui, sans-serif, 'Apple Color Emoji',
+        'Segoe UI Emoji', 'Segoe UI Symbol', 'Noto Color Emoji';
+
+    --radius-lg: var(--radius);
+    --radius-md: calc(var(--radius) - 3px);
+    --radius-sm: calc(var(--radius) - 6px);
+    --radius-xl: calc(var(--radius) + 4px);
+
+    --color-background: var(--background);
+    --color-foreground: var(--foreground);
+
+    --color-card: var(--card);
+    --color-card-foreground: var(--card-foreground);
+
+    --color-popover: var(--popover);
+    --color-popover-foreground: var(--popover-foreground);
+
+    --color-primary: var(--primary);
+    --color-primary-foreground: var(--primary-foreground);
+    --color-primary-deep: var(--primary-deep);
+    --color-primary-soft: var(--primary-soft);
+    /* Data fills only: never place text on this. */
+    --color-primary-bright: var(--primary-bright);
+
+    --color-secondary: var(--secondary);
+    --color-secondary-foreground: var(--secondary-foreground);
+
+    --color-muted: var(--muted);
+    --color-muted-foreground: var(--muted-foreground);
+
+    --color-accent: var(--accent);
+    --color-accent-foreground: var(--accent-foreground);
+
+    --color-destructive: var(--destructive);
+    --color-destructive-foreground: var(--destructive-foreground);
+    --color-destructive-soft: var(--destructive-soft);
+
+    --color-info: var(--info);
+    --color-info-soft: var(--info-soft);
+
+    --color-neutral-soft: var(--neutral-soft);
+
+    /* Stays dark in both themes: a deep panel inside a light rail. */
+    --color-ink-panel: var(--ink-panel);
+    --color-ink-panel-foreground: var(--ink-panel-foreground);
+
+    --color-border: var(--border);
+    --color-input: var(--input);
+    --color-ring: var(--ring);
+
+    --color-chart-1: var(--chart-1);
+    --color-chart-2: var(--chart-2);
+    --color-chart-3: var(--chart-3);
+    --color-chart-4: var(--chart-4);
+    --color-chart-5: var(--chart-5);
+
+    --color-sidebar: var(--sidebar);
+    --color-sidebar-foreground: var(--sidebar-foreground);
+    --color-sidebar-primary: var(--sidebar-primary);
+    --color-sidebar-primary-foreground: var(--sidebar-primary-foreground);
+    --color-sidebar-accent: var(--sidebar-accent);
+    --color-sidebar-accent-foreground: var(--sidebar-accent-foreground);
+    --color-sidebar-border: var(--sidebar-border);
+    --color-sidebar-ring: var(--sidebar-ring);
+
+    /* Lembut: a lifted surface reads by a soft offset shadow, never a halo. */
+    --shadow-lift:
+        0 1px 2px rgb(16 26 23 / 0.05), 0 1px 3px rgb(16 26 23 / 0.04);
+    --shadow-lift-lg:
+        0 4px 10px rgb(16 26 23 / 0.06), 0 12px 26px rgb(16 26 23 / 0.06);
+    /* The one depth above resting: a card held in the hand, not a card on the
+       page. Same ink tint, pushed far enough that the board reads underneath. */
+    --shadow-carry:
+        0 2px 6px rgb(16 26 23 / 0.08), 0 18px 40px rgb(16 26 23 / 0.16);
+    --shadow-teal: 0 4px 12px rgb(11 122 108 / 0.3);
+    --shadow-teal-lg: 0 8px 22px rgb(6 86 76 / 0.34);
+}
+
+:root {
+    --background: #f7f9f8;
+    --foreground: #101a17;
+    --card: #ffffff;
+    --card-foreground: #101a17;
+    --popover: #ffffff;
+    --popover-foreground: #101a17;
+
+    --primary: #0b7a6c;
+    --primary-foreground: #ffffff;
+    --primary-deep: #06564c;
+    --primary-soft: #e8f6f3;
+    --primary-bright: #12a594;
+
+    --secondary: #f1f5f4;
+    --secondary-foreground: #33413d;
+    --muted: #f1f5f4;
+    --muted-foreground: #64716d;
+    --accent: #e8f6f3;
+    --accent-foreground: #06564c;
+
+    --destructive: #c1381f;
+    --destructive-foreground: #ffffff;
+    --destructive-soft: #fdece9;
+
+    --info: #2f5c88;
+    --info-soft: #edf3fb;
+
+    --neutral-soft: #f1f5f4;
+
+    --ink-panel: #0f1a18;
+    --ink-panel-foreground: #ffffff;
+
+    --border: #e6ecea;
+    --input: #dde5e3;
+    --ring: #0b7a6c;
+
+    --chart-1: #12a594;
+    --chart-2: #7ecfc3;
+    --chart-3: #b7e2da;
+    --chart-4: #e2efec;
+    --chart-5: #c1381f;
+
+    --radius: 0.875rem;
+
+    --sidebar: #ffffff;
+    --sidebar-foreground: #33413d;
+    --sidebar-primary: #0b7a6c;
+    --sidebar-primary-foreground: #ffffff;
+    --sidebar-accent: #e8f6f3;
+    --sidebar-accent-foreground: #06564c;
+    --sidebar-border: #ebefed;
+    --sidebar-ring: #0b7a6c;
+}
+
+.dark {
+    --background: #0c1513;
+    --foreground: #e9f1ee;
+    --card: #111c19;
+    --card-foreground: #e9f1ee;
+    --popover: #111c19;
+    --popover-foreground: #e9f1ee;
+
+    --primary: #1cbca7;
+    --primary-foreground: #04211d;
+    --primary-deep: #9aeadb;
+    --primary-soft: #14302b;
+    --primary-bright: #24d6bd;
+
+    --secondary: #17241f;
+    --secondary-foreground: #d3e0dc;
+    --muted: #17241f;
+    --muted-foreground: #93a5a0;
+    --accent: #16302b;
+    --accent-foreground: #7fe3d3;
+
+    --destructive: #f0705a;
+    --destructive-foreground: #21100c;
+    --destructive-soft: #33201c;
+
+    --info: #8bb7e4;
+    --info-soft: #17273a;
+
+    --neutral-soft: #17241f;
+
+    --ink-panel: #08110f;
+    --ink-panel-foreground: #eef6f4;
+
+    --border: #1f2d29;
+    --input: #26352f;
+    --ring: #1cbca7;
+
+    --chart-1: #1cbca7;
+    --chart-2: #157e71;
+    --chart-3: #14554d;
+    --chart-4: #1a2f2b;
+    --chart-5: #f0705a;
+
+    --sidebar: #0f1815;
+    --sidebar-foreground: #c3d3ce;
+    --sidebar-primary: #1cbca7;
+    --sidebar-primary-foreground: #04211d;
+    --sidebar-accent: #16302b;
+    --sidebar-accent-foreground: #7fe3d3;
+    --sidebar-border: #1c2925;
+    --sidebar-ring: #1cbca7;
+}
+
+@layer base {
+    * {
+        @apply border-border;
+    }
+
+    body {
+        @apply bg-background text-foreground;
+    }
+
+    /* Browser surfaces belong to the palette, not to the browser. */
+    ::selection {
+        background-color: color-mix(in srgb, var(--primary) 22%, transparent);
+        color: var(--foreground);
+    }
+
+    :root {
+        color-scheme: light;
+        accent-color: var(--primary);
+    }
+
+    /*
+     * Chromium switches OFF every ::-webkit-scrollbar rule the moment
+     * scrollbar-width or scrollbar-color is set on an element, so the standard
+     * properties are served only to engines that have no pseudo-element at all.
+     */
+    @supports not selector(::-webkit-scrollbar) {
+        :root {
+            scrollbar-width: thin;
+            scrollbar-color: color-mix(
+                    in srgb,
+                    var(--foreground) 18%,
+                    transparent
+                )
+                transparent;
+        }
+    }
+
+    .dark {
+        color-scheme: dark;
+    }
+
+    input,
+    textarea,
+    [contenteditable] {
+        caret-color: var(--primary);
+    }
+
+    :focus-visible {
+        outline: 2px solid var(--ring);
+        outline-offset: 2px;
+        border-radius: var(--radius-sm);
+    }
+
+    a {
+        text-underline-offset: 3px;
+    }
+
+    /* Figures in a data surface never reflow as their value changes. */
+    table,
+    [data-numeric] {
+        font-variant-numeric: tabular-nums;
+    }
+
+    ::-webkit-scrollbar {
+        width: 11px;
+        height: 11px;
+    }
+
+    ::-webkit-scrollbar-track {
+        background: transparent;
+    }
+
+    ::-webkit-scrollbar-thumb {
+        background-color: color-mix(
+            in srgb,
+            var(--foreground) 16%,
+            transparent
+        );
+        border: 3px solid transparent;
+        background-clip: content-box;
+        border-radius: 999px;
+    }
+
+    ::-webkit-scrollbar-thumb:hover {
+        background-color: color-mix(
+            in srgb,
+            var(--foreground) 28%,
+            transparent
+        );
+        background-clip: content-box;
+    }
+}
+
+@layer utilities {
+    /* One authored moment: content settles in on first paint, already visible. */
+    @keyframes settle-in {
+        from {
+            opacity: 0.55;
+            transform: translateY(6px);
+        }
+
+        to {
+            opacity: 1;
+            transform: none;
+        }
+    }
+
+    .animate-settle {
+        animation: settle-in 520ms cubic-bezier(0.16, 1, 0.3, 1) backwards;
+    }
+
+    /* Picking a card up. The tilt is what makes it read as held rather than as
+       a copy: a page never rotates, a hand does. */
+    @keyframes pick-up {
+        from {
+            transform: rotate(0deg) scale(1);
+        }
+
+        to {
+            transform: rotate(2.5deg) scale(1.03);
+        }
+    }
+
+    .animate-pick-up {
+        animation: pick-up 160ms cubic-bezier(0.16, 1, 0.3, 1) forwards;
+    }
+
+    /* The data panel's own moment: figures draw themselves in the direction they
+       are read. Clip-path rather than scale, so radii and stroke weights hold. */
+    @keyframes draw-up {
+        from {
+            clip-path: inset(100% 0 0 0);
+        }
+
+        to {
+            clip-path: inset(0 0 0 0);
+        }
+    }
+
+    @keyframes draw-across {
+        from {
+            clip-path: inset(0 100% 0 0);
+        }
+
+        to {
+            clip-path: inset(0 0 0 0);
+        }
+    }
+
+    .animate-draw-up {
+        animation: draw-up 760ms cubic-bezier(0.16, 1, 0.3, 1) backwards;
+    }
+
+    .animate-draw-across {
+        animation: draw-across 820ms cubic-bezier(0.16, 1, 0.3, 1) backwards;
+    }
+
+    /* Scroll panes inside a surface. Hair-thin on purpose: the reach has to be
+       discoverable, so it is never removed, but it must not read as chrome. */
+    @supports not selector(::-webkit-scrollbar) {
+        .scroll-slim {
+            scrollbar-width: thin;
+            scrollbar-color: color-mix(
+                    in srgb,
+                    var(--foreground) 14%,
+                    transparent
+                )
+                transparent;
+        }
+
+        .scroll-slim:hover,
+        .scroll-slim:focus-within {
+            scrollbar-color: color-mix(in srgb, var(--primary) 42%, transparent)
+                transparent;
+        }
+    }
+
+    .scroll-slim::-webkit-scrollbar {
+        width: 5px;
+        height: 5px;
+    }
+
+    .scroll-slim::-webkit-scrollbar-track {
+        background: transparent;
+    }
+
+    .scroll-slim::-webkit-scrollbar-thumb {
+        background-color: color-mix(
+            in srgb,
+            var(--foreground) 13%,
+            transparent
+        );
+        border-radius: 999px;
+        transition: background-color 150ms ease-out;
+    }
+
+    .scroll-slim:hover::-webkit-scrollbar-thumb {
+        background-color: color-mix(in srgb, var(--primary) 42%, transparent);
+    }
+
+    .scroll-slim::-webkit-scrollbar-thumb:hover {
+        background-color: color-mix(in srgb, var(--primary) 65%, transparent);
+    }
+
+    .scroll-slim::-webkit-scrollbar-corner {
+        background: transparent;
+    }
+
+    @media (prefers-reduced-motion: reduce) {
+        .animate-settle,
+        .animate-draw-up,
+        .animate-draw-across,
+        .animate-pick-up {
+            animation: none;
+        }
+    }
+}
