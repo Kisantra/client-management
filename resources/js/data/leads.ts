@@ -73,6 +73,8 @@ export type LeadDetail = Lead & {
     owner: string | null;
     office: { lat: number; lng: number } | null;
     closedNote: string | null;
+    /** The piece on the calendar it came from, when the source is one. */
+    contentId: number | null;
 };
 
 export type StageStep = {

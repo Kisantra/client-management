@@ -28,11 +28,29 @@ export type SharedPipeline = {
     closeReasons: Record<string, { label: string; hint: string }>;
 };
 
+export type ContentStatusDef = {
+    key: string;
+    label: string;
+    hint: string;
+};
+
+/**
+ * config/content.php as the server shares it, so no screen keeps its own
+ * copy of which channels publish, what they carry, or the statuses.
+ */
+export type SharedContent = {
+    channels: string[];
+    formats: Record<string, Record<string, string>>;
+    statuses: ContentStatusDef[];
+    stuckAfterDays: Record<string, number>;
+};
+
 export type SharedProps = {
     name: string;
     auth: Auth;
     sidebarOpen: boolean;
     pipeline: SharedPipeline;
-    counts: { leads: number; clients: number } | null;
+    contentPlan: SharedContent;
+    counts: { leads: number; clients: number; content: number } | null;
     [key: string]: unknown;
 };

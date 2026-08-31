@@ -1,28 +1,16 @@
 import { Head, Link, router } from '@inertiajs/react';
-import {
-    ChevronLeft,
-    ChevronRight,
-    Columns3,
-    Plus,
-    Rows3,
-    Search,
-    X,
-} from 'lucide-react';
+import { Columns3, Plus, Rows3, Search, X } from 'lucide-react';
 import { useRef, useState } from 'react';
+import { CountChip } from '@/components/count-chip';
+import { FilterSelect } from '@/components/filter-select';
 import { DateRangeFilter } from '@/components/leads/date-range-filter';
 import type { EntryRange } from '@/components/leads/date-range-filter';
 import { LeadsBoard } from '@/components/leads/leads-board';
 import type { BoardColumn } from '@/components/leads/leads-board';
 import { LeadsTable } from '@/components/leads/leads-table';
 import type { LeadSort } from '@/components/leads/leads-table';
+import { ListPager } from '@/components/list-pager';
 import { Button } from '@/components/ui/button';
-import {
-    Select as SelectRoot,
-    SelectContent,
-    SelectItem,
-    SelectTrigger,
-    SelectValue,
-} from '@/components/ui/select';
 import { CHANNEL_LABELS } from '@/data/dashboard';
 import { asDate, rupiah } from '@/data/leads';
 import type { Lead } from '@/data/leads';
@@ -243,14 +231,14 @@ export default function Leads({
                     )}
                 >
                     <div className="flex min-w-max gap-2.5">
-                        <StageChip
+                        <CountChip
                             label="Semua"
                             count={total}
                             active={filters.tahap === 'semua'}
                             onClick={() => go({ tahap: 'semua' })}
                         />
                         {stages.map((item) => (
-                            <StageChip
+                            <CountChip
                                 key={item.key}
                                 label={item.label}
                                 count={item.count}
@@ -267,7 +255,7 @@ export default function Leads({
                             aria-hidden
                         />
 
-                        <StageChip
+                        <CountChip
                             label="Tidak lanjut"
                             count={closedCount}
                             active={closedView}
@@ -284,9 +272,11 @@ export default function Leads({
                 </div>
 
                 {/* Container-less: every control carries its own edge, so the
-                    row needs no panel to hold it together. */}
-                <div className="flex flex-wrap items-center gap-2.5">
-                    <label className="flex min-w-0 flex-1 items-center gap-2.5 rounded-md border border-border bg-card px-3.5 py-2.5 text-muted-foreground shadow-lift transition-[box-shadow,border-color] focus-within:border-primary/40 focus-within:ring-2 focus-within:ring-ring/40 sm:max-w-xs">
+                    row needs no panel to hold it together. On a phone the
+                    search takes the whole first row and the rest pair up
+                    beneath it, so no control is squeezed into a sliver. */}
+                <div className="grid grid-cols-2 gap-2.5 sm:flex sm:flex-wrap sm:items-center">
+                    <label className="col-span-2 flex min-w-0 items-center gap-2.5 rounded-md border border-border bg-card px-3.5 py-2.5 text-muted-foreground shadow-lift transition-[box-shadow,border-color] focus-within:border-primary/40 focus-within:ring-2 focus-within:ring-ring/40 sm:col-span-1 sm:max-w-xs sm:flex-1">
                         <Search
                             className="size-4 shrink-0"
                             strokeWidth={1.75}
@@ -298,11 +288,11 @@ export default function Leads({
                             value={query}
                             onChange={(event) => search(event.target.value)}
                             placeholder="Cari nama, PIC, layanan…"
-                            className="min-w-0 flex-1 bg-transparent text-[0.8438rem] text-foreground outline-none placeholder:text-muted-foreground"
+                            className="min-w-0 flex-1 bg-transparent text-base text-foreground outline-none placeholder:text-muted-foreground sm:text-[0.8438rem]"
                         />
                     </label>
 
-                    <Select
+                    <FilterSelect
                         label="Channel"
                         value={filters.channel}
                         onChange={(value) => go({ channel: value })}
@@ -315,6 +305,7 @@ export default function Leads({
                     />
 
                     <DateRangeFilter
+                        className="w-full sm:w-auto"
                         value={entryRange}
                         onChange={(range) =>
                             go({
@@ -324,7 +315,7 @@ export default function Leads({
                         }
                     />
 
-                    <Select
+                    <FilterSelect
                         label="Urutkan"
                         value={filters.urut}
                         onChange={(value) => go({ urut: value })}
@@ -349,7 +340,7 @@ export default function Leads({
                             }
                             aria-pressed={filters.status === 'mandek'}
                             className={cn(
-                                'rounded-md border px-3 py-2.5 text-[0.8438rem] font-bold shadow-lift transition-colors',
+                                'w-full rounded-md border px-3 py-2.5 text-[0.8438rem] font-bold shadow-lift transition-colors sm:w-auto',
                                 filters.status === 'mandek'
                                     ? 'border-destructive bg-destructive text-destructive-foreground'
                                     : 'border-border bg-card text-secondary-foreground hover:border-destructive/40 hover:text-destructive',
@@ -363,7 +354,7 @@ export default function Leads({
                         <button
                             type="button"
                             onClick={reset}
-                            className="inline-flex items-center gap-1.5 rounded-md px-2 py-2.5 text-[0.8438rem] font-bold text-muted-foreground underline decoration-transparent underline-offset-4 transition-colors hover:text-destructive hover:decoration-current"
+                            className="inline-flex items-center justify-center gap-1.5 rounded-md px-2 py-2.5 text-[0.8438rem] font-bold text-muted-foreground underline decoration-transparent underline-offset-4 transition-colors hover:text-destructive hover:decoration-current sm:justify-start"
                         >
                             <X
                                 className="size-3.5"
@@ -460,38 +451,11 @@ export default function Leads({
                                 </span>
                             </p>
 
-                            <div className="flex items-center gap-1.5">
-                                <PageButton
-                                    onClick={() =>
-                                        go({ page: rows.current - 1 })
-                                    }
-                                    disabled={rows.current === 1}
-                                    label="Halaman sebelumnya"
-                                >
-                                    <ChevronLeft
-                                        className="size-4"
-                                        strokeWidth={2.5}
-                                    />
-                                </PageButton>
-                                <span
-                                    className="px-1 font-semibold"
-                                    data-numeric
-                                >
-                                    {rows.current} / {rows.last}
-                                </span>
-                                <PageButton
-                                    onClick={() =>
-                                        go({ page: rows.current + 1 })
-                                    }
-                                    disabled={rows.current === rows.last}
-                                    label="Halaman berikutnya"
-                                >
-                                    <ChevronRight
-                                        className="size-4"
-                                        strokeWidth={2.5}
-                                    />
-                                </PageButton>
-                            </div>
+                            <ListPager
+                                current={rows.current}
+                                last={rows.last}
+                                onPage={(page) => go({ page })}
+                            />
                         </div>
                     </section>
                 ) : null}
@@ -534,116 +498,6 @@ function ViewButton({
         >
             {children}
             {label}
-        </button>
-    );
-}
-
-function StageChip({
-    label,
-    count,
-    active,
-    onClick,
-    tone = 'stage',
-}: {
-    label: string;
-    count: number;
-    active: boolean;
-    onClick: () => void;
-    /** 'closed' reads in ink rather than teal: it is an exit, not a step. */
-    tone?: 'stage' | 'closed';
-}) {
-    const closed = tone === 'closed';
-
-    return (
-        <button
-            type="button"
-            onClick={onClick}
-            aria-pressed={active}
-            className={cn(
-                'flex items-center gap-2 rounded-md border px-3.5 py-2.5 text-[0.8438rem] font-bold whitespace-nowrap transition-colors',
-                active
-                    ? closed
-                        ? 'border-ink-panel bg-ink-panel text-white'
-                        : 'border-primary bg-primary text-primary-foreground'
-                    : cn(
-                          'border-border bg-card text-secondary-foreground shadow-lift',
-                          closed
-                              ? 'hover:border-ink-panel/35 hover:text-foreground'
-                              : 'hover:border-primary/35 hover:text-primary-deep',
-                      ),
-            )}
-        >
-            {label}
-            <span
-                className={cn(
-                    'rounded-full px-1.5 py-px text-[0.6875rem] font-extrabold',
-                    active
-                        ? 'bg-white/20 text-white'
-                        : 'bg-neutral-soft text-muted-foreground',
-                )}
-                data-numeric
-            >
-                {count}
-            </span>
-        </button>
-    );
-}
-
-/** Wraps the project's shadcn Select so the toolbar keeps one call shape. */
-function Select({
-    label,
-    value,
-    onChange,
-    options,
-}: {
-    label: string;
-    value: string;
-    onChange: (value: string) => void;
-    options: { value: string; label: string }[];
-}) {
-    return (
-        <SelectRoot value={value} onValueChange={onChange}>
-            <SelectTrigger
-                aria-label={label}
-                className="h-auto rounded-md border-border bg-card py-2.5 text-[0.8438rem] font-semibold text-secondary-foreground shadow-lift transition-colors hover:border-primary/35 focus-visible:ring-[3px] data-[state=open]:border-primary/40"
-            >
-                <SelectValue placeholder={label} />
-            </SelectTrigger>
-            <SelectContent>
-                {options.map((option) => (
-                    <SelectItem
-                        key={option.value}
-                        value={option.value}
-                        className="text-[0.8438rem]"
-                    >
-                        {option.label}
-                    </SelectItem>
-                ))}
-            </SelectContent>
-        </SelectRoot>
-    );
-}
-
-function PageButton({
-    children,
-    onClick,
-    disabled,
-    label,
-}: {
-    children: React.ReactNode;
-    onClick: () => void;
-    disabled: boolean;
-    label: string;
-}) {
-    return (
-        <button
-            type="button"
-            onClick={onClick}
-            disabled={disabled}
-            className="grid size-8 place-items-center rounded-md bg-neutral-soft text-secondary-foreground transition-colors hover:bg-accent hover:text-accent-foreground disabled:pointer-events-none disabled:opacity-40"
-        >
-            {children}
-            <span className="sr-only">{label}</span>
         </button>
     );
 }

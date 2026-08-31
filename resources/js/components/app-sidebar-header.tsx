@@ -83,7 +83,7 @@ function SearchField({
                 type="search"
                 autoFocus={autoFocus}
                 placeholder="Cari lead, client, atau konten…"
-                className="min-w-0 flex-1 bg-transparent text-[0.8438rem] text-foreground outline-none placeholder:text-muted-foreground"
+                className="min-w-0 flex-1 bg-transparent text-base text-foreground outline-none placeholder:text-muted-foreground md:text-[0.8438rem]"
             />
         </label>
     );

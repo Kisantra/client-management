@@ -48,10 +48,6 @@ export const CHANNEL_LABELS: Record<ChannelKey, string> = {
     whatsapp: 'WhatsApp',
 };
 
-export const summary = {
-    published: { value: 27, target: 40, workingDaysLeft: 5 },
-};
-
 export const todayTasks: Task[] = [
     {
         id: 1,
@@ -137,9 +133,8 @@ export const team: TeamMember[] = [
     { name: 'Andre', initials: 'AR', assigned: 3, capacity: 8 },
 ];
 
-/** Leads and clients come from the server; these three have no module yet. */
+/** Leads, clients and content come from the server; these two have no module yet. */
 export const navCounts = {
-    content: 27,
     tasks: 12,
     team: 11,
 };

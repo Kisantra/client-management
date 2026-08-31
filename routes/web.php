@@ -1,5 +1,8 @@
 <?php
 
+use App\Http\Controllers\ClientController;
+use App\Http\Controllers\ContentController;
+use App\Http\Controllers\ContentStatusController;
 use App\Http\Controllers\DashboardController;
 use App\Http\Controllers\LeadClosureController;
 use App\Http\Controllers\LeadController;
@@ -38,8 +41,19 @@ Route::middleware(['auth', 'verified'])->group(function () {
             ->name('leads.follow-ups.destroy');
     });
 
-    Route::inertia('clients', 'clients')->name('clients');
-    Route::inertia('content', 'content')->name('content');
+    Route::get('clients', [ClientController::class, 'index'])->name('clients');
+    Route::get('content', [ContentController::class, 'index'])->name('content');
+    Route::post('content', [ContentController::class, 'store'])->name('content.store');
+    Route::get('content/create', [ContentController::class, 'create'])->name('content.create');
+
+    Route::prefix('content/{content}')->whereNumber('content')->group(function () {
+        Route::get('/', [ContentController::class, 'show'])->name('content.show');
+        Route::get('edit', [ContentController::class, 'edit'])->name('content.edit');
+        Route::post('/', [ContentController::class, 'update'])->name('content.update');
+        Route::delete('/', [ContentController::class, 'destroy'])->name('content.destroy');
+
+        Route::post('status', [ContentStatusController::class, 'store'])->name('content.status.store');
+    });
     Route::inertia('performance', 'performance')->name('performance');
     Route::inertia('tasks', 'tasks')->name('tasks');
     Route::inertia('team', 'team')->name('team');

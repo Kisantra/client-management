@@ -1,14 +1,38 @@
 import { LeadForm } from '@/components/leads/lead-form';
-import { leads } from '@/routes';
+import type { ContentOption } from '@/components/leads/lead-form';
+import { clients, leads } from '@/routes';
 import { create as leadsCreate } from '@/routes/leads';
 
-export default function LeadCreate({ services }: { services: string[] }) {
-    return <LeadForm lead={null} services={services} />;
+type Props = {
+    services: string[];
+    contents: Record<string, ContentOption[]>;
+    /** The stage the form opens on: 'client' when it comes from the Client page. */
+    stage: string;
+};
+
+export default function LeadCreate({ services, contents, stage }: Props) {
+    return (
+        <LeadForm
+            lead={null}
+            services={services}
+            contents={contents}
+            initialStage={stage}
+        />
+    );
 }
 
-LeadCreate.layout = {
-    breadcrumbs: [
-        { title: 'Leads', href: leads() },
-        { title: 'Tambah Lead', href: leadsCreate() },
-    ],
-};
+LeadCreate.layout = ({ stage }: Props) => ({
+    breadcrumbs:
+        stage === 'client'
+            ? [
+                  { title: 'Client', href: clients() },
+                  {
+                      title: 'Tambah Client',
+                      href: leadsCreate({ query: { tahap: 'client' } }),
+                  },
+              ]
+            : [
+                  { title: 'Leads', href: leads() },
+                  { title: 'Tambah Lead', href: leadsCreate() },
+              ],
+});

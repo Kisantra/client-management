@@ -5,6 +5,7 @@ namespace App\Models;
 use App\Support\Pipeline;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Support\Carbon;
 
@@ -47,6 +48,16 @@ class Lead extends Model
 
             $lead->stalled_at = $changed->copy()->addDays(Pipeline::threshold($lead->stage));
         });
+    }
+
+    /**
+     * The published piece this lead came in from, when it is on the calendar.
+     *
+     * @return BelongsTo<Content, $this>
+     */
+    public function content(): BelongsTo
+    {
+        return $this->belongsTo(Content::class);
     }
 
     public function stageEvents(): HasMany

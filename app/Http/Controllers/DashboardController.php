@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers;
 
+use App\Models\Content;
 use App\Models\Lead;
 use App\Models\LeadStageEvent;
 use App\Support\Pipeline;
@@ -52,12 +53,38 @@ class DashboardController extends Controller
                     'comparedTo' => self::MONTHS[$lastMonth->month - 1],
                 ],
                 'stalled' => $this->stalled(),
+                'published' => $this->published($thisMonth),
             ],
 
             'monthlyLeads' => $this->monthlyLeads(),
             'monthlyClients' => $this->monthlyClients(),
             'closed' => $this->closed($thisMonth),
         ]);
+    }
+
+    /**
+     * Content live this month against everything planned for it, plus the
+     * working days left to close the gap. The target is the team's own plan,
+     * not a number typed in somewhere.
+     *
+     * @return array{value: int, planned: int, workingDaysLeft: int}
+     */
+    private function published(Carbon $month): array
+    {
+        $range = [$month->toDateString(), $month->copy()->endOfMonth()->toDateString()];
+
+        // Weekdays from tomorrow to the month's end, inclusive.
+        $left = 0;
+
+        for ($day = Carbon::today()->addDay(); $day->lte($month->copy()->endOfMonth()); $day->addDay()) {
+            $left += $day->isWeekday() ? 1 : 0;
+        }
+
+        return [
+            'value' => Content::published()->whereBetween('scheduled_for', $range)->count(),
+            'planned' => Content::whereBetween('scheduled_for', $range)->count(),
+            'workingDaysLeft' => $left,
+        ];
     }
 
     /** Stage totals, and how many in each have stopped moving. */

@@ -33,6 +33,8 @@ class LeadRequest extends FormRequest
 
             'channel' => ['required', Rule::in(array_keys(Pipeline::channels()))],
             'source' => ['nullable', 'string', 'max:120'],
+            // The piece on the calendar the source names, when it is one.
+            'content_id' => ['nullable', 'integer', Rule::exists('contents', 'id')],
             'entered_at' => ['required', 'date', 'before_or_equal:today'],
 
             'service' => ['required', 'string', 'max:80'],

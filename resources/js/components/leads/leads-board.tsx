@@ -243,7 +243,14 @@ export function LeadsBoard({ columns, loadMore }: Props) {
         <>
             <div
                 ref={scroller}
-                className="scroll-slim -mx-4 overflow-x-auto px-4 pb-3 sm:-mx-6 sm:px-6"
+                className={cn(
+                    'scroll-slim -mx-4 overflow-x-auto px-4 pb-3 sm:-mx-6 sm:px-6',
+                    /* A finger swipes column to column on a phone; the edge
+                       auto-scroll during a drag must not be snapped back. */
+                    carried
+                        ? 'snap-none'
+                        : 'snap-x snap-mandatory scroll-pl-4 md:snap-none',
+                )}
             >
                 <div className="flex min-w-max gap-4">
                     {columns.map((column) => {
@@ -259,7 +266,7 @@ export function LeadsBoard({ columns, loadMore }: Props) {
                                 data-stage={column.key}
                                 aria-label={`${column.label}, ${column.count} lead`}
                                 className={cn(
-                                    'flex w-[19rem] shrink-0 flex-col rounded-xl transition-colors duration-150',
+                                    'flex w-[min(19rem,100vw-3.5rem)] shrink-0 snap-start flex-col rounded-xl transition-colors duration-150',
                                     isTarget
                                         ? 'bg-primary-soft'
                                         : 'bg-neutral-soft/80',
@@ -535,7 +542,7 @@ function StageMenu({
                     type="button"
                     // The menu is not a handle: pressing it must not pick the card up.
                     onPointerDown={(event) => event.stopPropagation()}
-                    className="-mr-1 grid size-6 shrink-0 place-items-center rounded-md text-muted-foreground opacity-60 transition-[opacity,background-color,color] group-hover/card:opacity-100 hover:bg-neutral-soft hover:text-foreground focus-visible:opacity-100"
+                    className="-mt-0.5 -mr-1.5 grid size-7 shrink-0 place-items-center rounded-md text-muted-foreground opacity-60 transition-[opacity,background-color,color] group-hover/card:opacity-100 hover:bg-neutral-soft hover:text-foreground focus-visible:opacity-100"
                 >
                     <MoreHorizontal className="size-4" strokeWidth={2.5} />
                     <span className="sr-only">

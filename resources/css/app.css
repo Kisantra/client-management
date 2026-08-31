@@ -51,6 +51,16 @@
 
     --color-neutral-soft: var(--neutral-soft);
 
+    /* Publishing channels, each in its own tint: the calendar reads by platform. */
+    --color-channel-instagram: var(--channel-instagram);
+    --color-channel-instagram-foreground: var(--channel-instagram-foreground);
+    --color-channel-tiktok: var(--channel-tiktok);
+    --color-channel-tiktok-foreground: var(--channel-tiktok-foreground);
+    --color-channel-linkedin: var(--channel-linkedin);
+    --color-channel-linkedin-foreground: var(--channel-linkedin-foreground);
+    --color-channel-web: var(--channel-web);
+    --color-channel-web-foreground: var(--channel-web-foreground);
+
     /* Stays dark in both themes: a deep panel inside a light rail. */
     --color-ink-panel: var(--ink-panel);
     --color-ink-panel-foreground: var(--ink-panel-foreground);
@@ -117,6 +127,15 @@
 
     --neutral-soft: #f1f5f4;
 
+    --channel-instagram: #fce8f1;
+    --channel-instagram-foreground: #9d1f57;
+    --channel-tiktok: #e8eef0;
+    --channel-tiktok-foreground: #14232b;
+    --channel-linkedin: #e4eefa;
+    --channel-linkedin-foreground: #0b4f8c;
+    --channel-web: #fdf0dc;
+    --channel-web-foreground: #8a4a05;
+
     --ink-panel: #0f1a18;
     --ink-panel-foreground: #ffffff;
 
@@ -171,6 +190,15 @@
     --info-soft: #17273a;
 
     --neutral-soft: #17241f;
+
+    --channel-instagram: #3a1a2a;
+    --channel-instagram-foreground: #f5a3c7;
+    --channel-tiktok: #1d2a30;
+    --channel-tiktok-foreground: #cfe3ea;
+    --channel-linkedin: #16283d;
+    --channel-linkedin-foreground: #9cc5f2;
+    --channel-web: #3a2a12;
+    --channel-web-foreground: #f2c37c;
 
     --ink-panel: #08110f;
     --ink-panel-foreground: #eef6f4;

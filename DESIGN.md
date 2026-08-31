@@ -208,6 +208,9 @@ A cool, slightly green-shifted neutral field carrying one teal voice and one bri
 - **Quiet Surface** (`{colors.neutral-soft}`): The recessed neutral. Search field, header icon buttons, meta chips, unfilled meter slots, and every bar track.
 - **Hairline** (`{colors.border}`) and **Field Edge** (`{colors.input}`): 1px separation only.
 
+### Channel Tints
+- **Instagram** (`{colors.channel-instagram}` / `{colors.channel-instagram-foreground}`), **TikTok** (`{colors.channel-tiktok}` / `-foreground`), **LinkedIn** (`{colors.channel-linkedin}` / `-foreground`), **Web/SEO** (`{colors.channel-web}` / `-foreground`): one soft bed and one reading ink per publishing channel, so the content calendar reads by platform at a glance. They carry identity only, never state: a live piece is a filled chip, an unpublished one is outlined in the same ink, and a late one drops the tint for Alarm Wash. Each ink clears 4.5:1 on its bed and on Panel White.
+
 ### Chart Ramp
 - **`{colors.chart-2}` / `{colors.chart-3}` / `{colors.chart-4}`**: The descending teal steps for non-focal data marks. The twelve-month chart reads as one hue at three depths with the current period in full Deep Teal, so recency is carried by saturation rather than by a second color.
 

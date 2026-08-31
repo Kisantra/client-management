@@ -47,7 +47,8 @@ import {
     useStageRequirement,
 } from '@/hooks/use-pipeline';
 import { cn } from '@/lib/utils';
-import { leads } from '@/routes';
+import { clients, leads } from '@/routes';
+import { show as contentShow } from '@/routes/content';
 import { edit as leadEdit } from '@/routes/leads';
 import { destroy as reopenLead } from '@/routes/leads/closure';
 import { update as updateFollowUp } from '@/routes/leads/follow-ups';
@@ -73,6 +74,8 @@ export default function LeadDetailPage({
     const labels = useStageLabels();
 
     const closed = lead.status !== 'aktif';
+    /** Won and still running: the Client page is home now, not the board. */
+    const isClient = !closed && lead.stage === 'client';
     const nextFollowUp = closed
         ? undefined
         : followUps.find((item) => !item.done);
@@ -92,7 +95,7 @@ export default function LeadDetailPage({
                 <div className="flex flex-wrap items-end justify-between gap-4">
                     <div className="min-w-0">
                         <Link
-                            href={leads()}
+                            href={isClient ? clients() : leads()}
                             className="inline-flex items-center gap-1.5 text-xs font-bold text-muted-foreground transition-colors hover:text-primary-deep"
                         >
                             <ArrowLeft
@@ -100,10 +103,10 @@ export default function LeadDetailPage({
                                 strokeWidth={2.5}
                                 aria-hidden
                             />
-                            Kembali ke Leads
+                            Kembali ke {isClient ? 'Client' : 'Leads'}
                         </Link>
 
-                        <h1 className="mt-2 text-2xl font-extrabold tracking-[-0.03em] sm:text-[1.5625rem]">
+                        <h1 className="mt-2 text-2xl font-extrabold tracking-[-0.03em] break-words sm:text-[1.5625rem]">
                             {lead.company}
                         </h1>
 
@@ -139,11 +142,13 @@ export default function LeadDetailPage({
                         </p>
                     </div>
 
-                    <div className="flex flex-wrap gap-2.5">
+                    {/* On a phone the actions share the row's full width, so
+                        each is a thumb-sized target instead of a short pill. */}
+                    <div className="flex w-full flex-wrap gap-2.5 sm:w-auto">
                         {closed ? (
                             <Button
                                 size="lg"
-                                className="shadow-teal"
+                                className="flex-1 shadow-teal sm:flex-none"
                                 onClick={reopen}
                                 disabled={reopening}
                             >
@@ -160,6 +165,7 @@ export default function LeadDetailPage({
                                 <Button
                                     size="lg"
                                     variant="outline"
+                                    className="flex-1 sm:flex-none"
                                     onClick={() => setFollowUpOpen(true)}
                                 >
                                     <CalendarClock
@@ -170,7 +176,12 @@ export default function LeadDetailPage({
                                 </Button>
                             </>
                         )}
-                        <Button size="lg" variant="outline" asChild>
+                        <Button
+                            size="lg"
+                            variant="outline"
+                            className="flex-1 sm:flex-none"
+                            asChild
+                        >
                             <Link href={leadEdit(lead.id)}>
                                 <Pencil strokeWidth={2} aria-hidden />
                                 Ubah
@@ -357,10 +368,14 @@ export default function LeadDetailPage({
                         </Panel>
                     </div>
 
-                    <aside className="flex flex-col gap-5 xl:sticky xl:top-6">
+                    {/* Below xl the aside dissolves into the page column so
+                        Status can lead on a phone: where the lead stands and
+                        what is due comes before its history. */}
+                    <aside className="contents xl:sticky xl:top-6 xl:flex xl:flex-col xl:gap-5">
                         <Panel
                             title="Status"
                             description="Posisi sekarang dan batas wajar tahapnya."
+                            className="-order-1 xl:order-none"
                         >
                             <dl className="flex flex-col gap-3.5 text-[0.8438rem]">
                                 <Row label="Di tahap ini">
@@ -440,10 +455,23 @@ export default function LeadDetailPage({
                                 {CHANNEL_LABELS[lead.channel]}
                             </p>
                             <p className="mt-2.5 text-[0.8438rem] font-bold">
-                                {lead.source}
+                                {lead.contentId ? (
+                                    <Link
+                                        href={contentShow(lead.contentId)}
+                                        prefetch
+                                        className="underline decoration-transparent underline-offset-4 transition-colors hover:text-primary-deep hover:decoration-current"
+                                    >
+                                        {lead.source}
+                                    </Link>
+                                ) : (
+                                    lead.source
+                                )}
                             </p>
                             <p className="mt-1 text-xs text-muted-foreground">
                                 Lead masuk pada {entryDate(lead.entryAt)}.
+                                {lead.contentId
+                                    ? ' Buka kontennya untuk melihat lead lain yang datang darinya.'
+                                    : ''}
                             </p>
                         </Panel>
 
@@ -521,14 +549,14 @@ function FileChip({ file }: { file: NoteFile }) {
             href={file.url}
             target="_blank"
             rel="noopener noreferrer"
-            className="inline-flex items-center gap-1.5 rounded-full bg-neutral-soft py-1 pr-2.5 pl-2 text-[0.6875rem] font-bold text-secondary-foreground transition-colors hover:bg-accent hover:text-primary-deep"
+            className="inline-flex max-w-full items-center gap-1.5 rounded-full bg-neutral-soft py-1 pr-2.5 pl-2 text-[0.6875rem] font-bold text-secondary-foreground transition-colors hover:bg-accent hover:text-primary-deep"
         >
             {image ? (
                 <ImageIcon className="size-3" strokeWidth={2} aria-hidden />
             ) : (
                 <FileText className="size-3" strokeWidth={2} aria-hidden />
             )}
-            {file.name}
+            <span className="truncate">{file.name}</span>
         </a>
     );
 }
@@ -553,7 +581,12 @@ function FollowUpList({
     return (
         <ul className="flex flex-col gap-3">
             {items.map((item) => (
-                <li key={item.id} className="flex items-start gap-3">
+                <li
+                    key={item.id}
+                    /* The action sits beside the text where there is room and
+                       drops under it on a phone, instead of pinching the note. */
+                    className="grid grid-cols-[auto_1fr] gap-x-3 gap-y-1.5 sm:grid-cols-[auto_1fr_auto] sm:items-start"
+                >
                     <span
                         className={cn(
                             'mt-0.5 grid size-7 shrink-0 place-items-center rounded-md',
@@ -573,7 +606,7 @@ function FollowUpList({
                         )}
                     </span>
 
-                    <span className="min-w-0 flex-1">
+                    <span className="min-w-0">
                         <span className="flex flex-wrap items-baseline gap-x-2 gap-y-0.5">
                             <span
                                 className={cn(
@@ -614,7 +647,7 @@ function FollowUpList({
                                     { preserveScroll: true },
                                 )
                             }
-                            className="shrink-0 rounded-md px-2 py-1 text-[0.6875rem] font-bold text-muted-foreground transition-colors hover:bg-primary-soft hover:text-primary-deep"
+                            className="col-start-2 justify-self-start rounded-md bg-neutral-soft px-2.5 py-1.5 text-xs font-bold text-secondary-foreground transition-colors hover:bg-primary-soft hover:text-primary-deep sm:col-start-3 sm:justify-self-end"
                         >
                             Tandai selesai
                         </button>
@@ -727,7 +760,7 @@ function StageMenu({
     return (
         <DropdownMenu>
             <DropdownMenuTrigger asChild>
-                <Button size="lg" className="shadow-teal">
+                <Button size="lg" className="flex-1 shadow-teal sm:flex-none">
                     Pindah tahap
                 </Button>
             </DropdownMenuTrigger>
@@ -789,14 +822,21 @@ function StageMenu({
 function Panel({
     title,
     description,
+    className,
     children,
 }: {
     title: string;
     description: string;
+    className?: string;
     children: React.ReactNode;
 }) {
     return (
-        <section className="min-w-0 rounded-xl border border-border bg-card p-5 shadow-lift sm:p-6">
+        <section
+            className={cn(
+                'min-w-0 rounded-xl border border-border bg-card p-5 shadow-lift sm:p-6',
+                className,
+            )}
+        >
             <h2 className="text-base font-extrabold tracking-[-0.02em]">
                 {title}
             </h2>
@@ -837,7 +877,7 @@ function Row({
     return (
         <div className="flex items-baseline justify-between gap-3">
             <dt className="shrink-0 text-muted-foreground">{label}</dt>
-            <dd className="truncate text-right font-bold">{children}</dd>
+            <dd className="min-w-0 text-right font-bold">{children}</dd>
         </div>
     );
 }
@@ -859,7 +899,7 @@ function ContactAction({
             {...(external
                 ? { target: '_blank', rel: 'noopener noreferrer' }
                 : {})}
-            className="inline-flex items-center gap-2 rounded-md border border-border bg-card px-3 py-2 text-[0.8438rem] font-bold text-secondary-foreground shadow-lift transition-colors hover:border-primary/35 hover:text-primary-deep"
+            className="inline-flex items-center gap-2 rounded-md border border-border bg-card px-3 py-2.5 text-[0.8438rem] font-bold text-secondary-foreground shadow-lift transition-colors hover:border-primary/35 hover:text-primary-deep"
         >
             <Icon className="size-4" strokeWidth={1.75} aria-hidden />
             {label}
@@ -867,6 +907,10 @@ function ContactAction({
     );
 }
 
-LeadDetailPage.layout = {
-    breadcrumbs: [{ title: 'Leads', href: leads() }],
-};
+/* The trail follows the record: a running client is filed under Client. */
+LeadDetailPage.layout = ({ lead }: Props) => ({
+    breadcrumbs:
+        lead.status === 'aktif' && lead.stage === 'client'
+            ? [{ title: 'Client', href: clients() }]
+            : [{ title: 'Leads', href: leads() }],
+});

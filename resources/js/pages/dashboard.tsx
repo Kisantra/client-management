@@ -14,7 +14,7 @@ import { MiniBars, MiniLine, MiniRing } from '@/components/dashboard/stat-viz';
 import { TaskList } from '@/components/dashboard/task-list';
 import { TeamLoad } from '@/components/dashboard/team-load';
 import { Button } from '@/components/ui/button';
-import { summary, todayTasks } from '@/data/dashboard';
+import { todayTasks } from '@/data/dashboard';
 import { clients, content, dashboard, leads, tasks } from '@/routes';
 import { create as leadsCreate } from '@/routes/leads';
 
@@ -42,6 +42,8 @@ type Props = {
             worstStage: string | null;
             worstDays: number | null;
         };
+        /** Live this month against the month's own plan. */
+        published: { value: number; planned: number; workingDaysLeft: number };
     };
     monthlyLeads: LeadMonth[];
     monthlyClients: number[];
@@ -185,28 +187,32 @@ export default function Dashboard({
                     />
                     <StatTile
                         label="Konten Tayang"
-                        hint="Konten yang sudah tayang bulan ini, dibanding target bulanan."
-                        value={summary.published.value}
+                        hint="Konten yang sudah tayang bulan ini, dibanding semua yang dijadwalkan bulan ini."
+                        value={figures.published.value}
                         valueSuffix={
                             <span className="text-base font-medium text-muted-foreground">
                                 {' '}
-                                / {summary.published.target}
+                                / {figures.published.planned}
                             </span>
                         }
                         href={content()}
                         delay={180}
-                        compare={`sisa ${summary.published.target - summary.published.value} dalam ${summary.published.workingDaysLeft} hari kerja`}
+                        compare={
+                            figures.published.planned > figures.published.value
+                                ? `sisa ${figures.published.planned - figures.published.value} dalam ${figures.published.workingDaysLeft} hari kerja`
+                                : 'semua yang direncanakan sudah tayang'
+                        }
                         delta={{
-                            text: `${Math.round((summary.published.value / summary.published.target) * 100)}%`,
+                            text: `${figures.published.planned === 0 ? 0 : Math.round((figures.published.value / figures.published.planned) * 100)}%`,
                             direction: 'flat',
                         }}
                         viz={
                             <MiniRing
-                                value={summary.published.value}
-                                max={summary.published.target}
+                                value={figures.published.value}
+                                max={figures.published.planned || 1}
                                 trackClassName="stroke-neutral-soft"
                                 arcClassName="stroke-primary"
-                                label={`${summary.published.value} dari ${summary.published.target} konten tayang`}
+                                label={`${figures.published.value} dari ${figures.published.planned} konten tayang`}
                             />
                         }
                     />

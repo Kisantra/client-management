@@ -2,7 +2,9 @@
 
 namespace App\Http\Middleware;
 
+use App\Models\Content;
 use App\Models\Lead;
+use App\Support\ContentPlan;
 use App\Support\Pipeline;
 use Closure;
 use Illuminate\Http\Request;
@@ -84,10 +86,19 @@ class HandleInertiaRequests extends Middleware
                 'closeReasons' => Pipeline::closeReasons(),
             ],
 
+            /*
+             | config/content.php, the same way. Named apart from the `content`
+             | prop a page may carry, so a piece's own record can never shadow
+             | the plan it is read against.
+             */
+            'contentPlan' => ContentPlan::forClient(),
+
             // Sidebar badges: what each module actually holds right now.
             'counts' => fn () => $request->user() ? [
                 'leads' => Lead::active()->count(),
                 'clients' => Lead::active()->where('stage', 'client')->count(),
+                // Still in production: everything not yet live.
+                'content' => Content::where('status', '!=', Content::PUBLISHED)->count(),
             ] : null,
         ];
     }

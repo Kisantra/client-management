@@ -35,9 +35,9 @@ import { edit as editProfile } from '@/routes/profile';
 import type { NavGroup, SharedProps } from '@/types';
 
 /**
- * `counts` comes from the server on every page, so the Leads and Client badges
- * are the real totals; the rest are still sample figures from modules that do
- * not exist yet.
+ * `counts` comes from the server on every page, so the Leads, Client and
+ * Konten badges are the real totals; the rest are still sample figures from
+ * modules that do not exist yet.
  */
 function buildNav(counts: SharedProps['counts']): NavGroup[] {
     return [
@@ -61,7 +61,7 @@ function buildNav(counts: SharedProps['counts']): NavGroup[] {
                     title: 'Konten',
                     href: content(),
                     icon: CalendarDays,
-                    badge: navCounts.content,
+                    badge: counts?.content ?? 0,
                 },
                 {
                     title: 'Performa',

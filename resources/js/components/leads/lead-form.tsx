@@ -30,27 +30,46 @@ import type { ChannelKey } from '@/data/dashboard';
 import { asDate, shortRupiah, TODAY } from '@/data/leads';
 import { usePipeline, useStageLabels } from '@/hooks/use-pipeline';
 import { cn } from '@/lib/utils';
-import { leads } from '@/routes';
+import { clients, leads } from '@/routes';
 import { store as leadsStore, update as leadsUpdate } from '@/routes/leads';
 
 const ENTITIES = ['PT', 'CV', 'UD', 'Koperasi', 'Perorangan'];
 
-/** Content the team has published, so the source is picked, not retyped. */
-const CONTENT: Record<ChannelKey, string[]> = {
-    instagram: ['Batas Lapor SPT Badan', 'Checklist dokumen pajak'],
-    tiktok: ['5 Kesalahan Pembukuan UMKM', 'Checklist audit internal'],
-    linkedin: ['PPh 21 karyawan — contoh hitung', 'Tax planning untuk PT baru'],
-    web: [
-        'Insentif pajak 2026',
-        'Panduan restitusi PPN',
-        'Syarat pendirian PT 2026',
-    ],
-    whatsapp: [
-        'Chat langsung',
-        'Broadcast WhatsApp',
-        'Referensi dari client lain',
-    ],
-};
+/** WhatsApp publishes nothing, so its ways in are a short fixed list. */
+const WHATSAPP_SOURCES = [
+    'Chat langsung',
+    'Broadcast WhatsApp',
+    'Referensi dari client lain',
+];
+
+/** Chosen when the source is not on the calendar, or not content at all. */
+const CUSTOM_SOURCE = '__lainnya_asal__';
+
+/** A published piece the form can name as the source. */
+export type ContentOption = { id: number; title: string };
+
+/**
+ * Where an existing lead's source select should start: its piece, if it is
+ * on the calendar; a WhatsApp way in; or the free text it was typed as.
+ */
+function initialSource(lead: EditableLead | null): {
+    pick: string;
+    custom: string;
+} {
+    if (!lead || !lead.source) {
+        return { pick: '', custom: '' };
+    }
+
+    if (lead.contentId) {
+        return { pick: String(lead.contentId), custom: '' };
+    }
+
+    if (lead.channel === 'whatsapp' && WHATSAPP_SOURCES.includes(lead.source)) {
+        return { pick: lead.source, custom: '' };
+    }
+
+    return { pick: CUSTOM_SOURCE, custom: lead.source };
+}
 
 /** Chosen when the enquiry does not match any listed service. */
 const CUSTOM_SERVICE = '__lainnya__';
@@ -75,6 +94,8 @@ export type EditableLead = {
     office: { lat: number; lng: number } | null;
     channel: ChannelKey;
     source: string | null;
+    /** The piece on the calendar the source names, when it is one. */
+    contentId: number | null;
     service: string;
     value: number;
     stage: string;
@@ -90,9 +111,15 @@ const thousands = (digits: string) =>
 export function LeadForm({
     lead,
     services,
+    contents,
+    initialStage = 'lead',
 }: {
     lead: EditableLead | null;
     services: string[];
+    /** What is live on each publishing channel, from the calendar. */
+    contents: Record<string, ContentOption[]>;
+    /** Where a new lead starts. The Client page opens the form on 'client'. */
+    initialStage?: string;
 }) {
     const { stages } = usePipeline();
     const stageLabels = useStageLabels();
@@ -127,13 +154,18 @@ export function LeadForm({
     const [channel, setChannel] = useState<ChannelKey | ''>(
         lead?.channel ?? '',
     );
-    const [source, setSource] = useState(lead?.source ?? '');
+    const [sourcePick, setSourcePick] = useState(
+        () => initialSource(lead).pick,
+    );
+    const [customSource, setCustomSource] = useState(
+        () => initialSource(lead).custom,
+    );
     const [entryAt, setEntryAt] = useState<Date | undefined>(
         lead ? asDate(lead.enteredAt) : TODAY,
     );
     const [dateOpen, setDateOpen] = useState(false);
 
-    const [stage, setStage] = useState(lead?.stage ?? 'lead');
+    const [stage, setStage] = useState(lead?.stage ?? initialStage);
     const [owner, setOwner] = useState(lead?.owner ?? '');
 
     const [errors, setErrors] = useState<Errors>({});
@@ -144,13 +176,55 @@ export function LeadForm({
         service === CUSTOM_SERVICE ? customService.trim() : service;
     const fullName = company ? `${entity} ${company}`.trim() : '';
 
-    /** The lead's own source stays selectable even if it is not on the list. */
-    const sources = channel
-        ? [
-              ...CONTENT[channel],
-              ...(source && !CONTENT[channel].includes(source) ? [source] : []),
-          ]
-        : [];
+    /*
+     | Opened from the Client page: same form, but the copy says what it is
+     | doing, and the way back leads to where the client will appear.
+     */
+    const creatingClient = lead === null && initialStage === 'client';
+    const back = creatingClient ? clients() : leads();
+    const saveLabel = saving
+        ? 'Menyimpan…'
+        : lead
+          ? 'Simpan Perubahan'
+          : creatingClient
+            ? 'Simpan Client'
+            : 'Simpan Lead';
+
+    /*
+     | The source is picked, not typed: a published piece from the calendar,
+     | so the chain back to it is a real link. A piece since pulled from the
+     | calendar stays selectable for the lead that came from it.
+     */
+    const sourceOptions: ContentOption[] =
+        channel && channel !== 'whatsapp'
+            ? [
+                  ...(contents[channel] ?? []),
+                  ...(lead?.contentId &&
+                  lead.channel === channel &&
+                  !(contents[channel] ?? []).some(
+                      (item) => item.id === lead.contentId,
+                  )
+                      ? [{ id: lead.contentId, title: lead.source ?? '' }]
+                      : []),
+              ]
+            : [];
+    const pickedContent = sourceOptions.find(
+        (item) => String(item.id) === sourcePick,
+    );
+    const resolvedSource =
+        sourcePick === CUSTOM_SOURCE
+            ? customSource.trim()
+            : pickedContent
+              ? pickedContent.title
+              : channel === 'whatsapp'
+                ? sourcePick
+                : '';
+    const contentId = pickedContent?.id ?? null;
+    const sourceHint = !channel
+        ? 'Pilih channel dulu untuk melihat daftar kontennya.'
+        : channel !== 'whatsapp' && sourceOptions.length === 0
+          ? 'Belum ada konten tayang di channel ini. Pilih Lainnya dan tulis judulnya.'
+          : undefined;
 
     const submit = (event: React.FormEvent) => {
         event.preventDefault();
@@ -202,7 +276,8 @@ export function LeadForm({
             office_lat: office?.lat ?? '',
             office_lng: office?.lng ?? '',
             channel,
-            source: source.trim(),
+            source: resolvedSource,
+            content_id: contentId ?? '',
             entered_at: toIso(entryAt ?? TODAY),
             service: resolvedService,
             value: numericValue,
@@ -240,7 +315,15 @@ export function LeadForm({
 
     return (
         <>
-            <Head title={lead ? `Ubah ${lead.company}` : 'Tambah Lead'} />
+            <Head
+                title={
+                    lead
+                        ? `Ubah ${lead.company}`
+                        : creatingClient
+                          ? 'Tambah Client'
+                          : 'Tambah Lead'
+                }
+            />
 
             <form
                 onSubmit={submit}
@@ -250,7 +333,7 @@ export function LeadForm({
                 <div className="flex flex-wrap items-end justify-between gap-4">
                     <div>
                         <Link
-                            href={leads()}
+                            href={back}
                             className="inline-flex items-center gap-1.5 text-xs font-bold text-muted-foreground transition-colors hover:text-primary-deep"
                         >
                             <ArrowLeft
@@ -258,19 +341,25 @@ export function LeadForm({
                                 strokeWidth={2.5}
                                 aria-hidden
                             />
-                            Kembali ke Leads
+                            Kembali ke {creatingClient ? 'Client' : 'Leads'}
                         </Link>
                         <h1 className="mt-2 text-2xl font-extrabold tracking-[-0.03em] sm:text-[1.5625rem]">
-                            {lead ? 'Ubah Lead' : 'Tambah Lead'}
+                            {lead
+                                ? 'Ubah Lead'
+                                : creatingClient
+                                  ? 'Tambah Client'
+                                  : 'Tambah Lead'}
                         </h1>
                         <p className="mt-1 text-sm text-muted-foreground">
                             {lead
                                 ? `Mengubah ${entity} ${lead.company}. Perpindahan tahap dari sini tercatat di perjalanan lead.`
-                                : 'Hanya nama client, PIC, asal, dan layanan yang wajib — sisanya bisa dilengkapi belakangan.'}
+                                : creatingClient
+                                  ? 'Client yang sudah berjalan sebelum sistem ini dipakai. Ia masuk langsung ke tahap Client aktif, terhitung sejak tanggal yang dipilih di bawah.'
+                                  : 'Hanya nama client, PIC, asal, dan layanan yang wajib — sisanya bisa dilengkapi belakangan.'}
                         </p>
                     </div>
 
-                    <div className="flex flex-wrap gap-2.5">
+                    <div className="hidden gap-2.5 sm:flex sm:flex-wrap">
                         <Button
                             size="lg"
                             type="submit"
@@ -278,14 +367,10 @@ export function LeadForm({
                             disabled={saving}
                         >
                             <Check strokeWidth={2.5} aria-hidden />
-                            {saving
-                                ? 'Menyimpan…'
-                                : lead
-                                  ? 'Simpan Perubahan'
-                                  : 'Simpan Lead'}
+                            {saveLabel}
                         </Button>
                         <Button size="lg" variant="outline" asChild>
-                            <Link href={leads()}>Batal</Link>
+                            <Link href={back}>Batal</Link>
                         </Button>
                     </div>
                 </div>
@@ -485,7 +570,8 @@ export function LeadForm({
                                     value={channel}
                                     onValueChange={(next) => {
                                         setChannel(next as ChannelKey);
-                                        setSource('');
+                                        setSourcePick('');
+                                        setCustomSource('');
                                     }}
                                 >
                                     <SelectTrigger
@@ -512,44 +598,89 @@ export function LeadForm({
 
                             <Field
                                 id="source"
-                                label="Konten yang membawanya"
-                                optional
-                                hint={
-                                    channel
-                                        ? undefined
-                                        : 'Pilih channel dulu untuk melihat daftar kontennya.'
+                                label={
+                                    channel === 'whatsapp'
+                                        ? 'Jalur masuk'
+                                        : 'Konten yang membawanya'
                                 }
+                                optional
+                                hint={sourceHint}
                             >
                                 <Select
-                                    value={source}
-                                    onValueChange={setSource}
+                                    value={sourcePick}
+                                    onValueChange={setSourcePick}
                                     disabled={!channel}
                                 >
                                     <SelectTrigger
                                         id="source"
                                         className="w-full"
                                         aria-describedby={
-                                            channel ? undefined : 'source-hint'
+                                            sourceHint
+                                                ? 'source-hint'
+                                                : undefined
                                         }
                                     >
-                                        <SelectValue placeholder="Pilih konten" />
+                                        <SelectValue
+                                            placeholder={
+                                                channel === 'whatsapp'
+                                                    ? 'Pilih jalur masuk'
+                                                    : 'Pilih konten'
+                                            }
+                                        />
                                     </SelectTrigger>
                                     <SelectContent>
-                                        {sources.map((title) => (
-                                            <SelectItem
-                                                key={title}
-                                                value={title}
-                                            >
-                                                {title}
-                                            </SelectItem>
-                                        ))}
+                                        {channel === 'whatsapp'
+                                            ? WHATSAPP_SOURCES.map((title) => (
+                                                  <SelectItem
+                                                      key={title}
+                                                      value={title}
+                                                  >
+                                                      {title}
+                                                  </SelectItem>
+                                              ))
+                                            : sourceOptions.map((item) => (
+                                                  <SelectItem
+                                                      key={item.id}
+                                                      value={String(item.id)}
+                                                  >
+                                                      {item.title}
+                                                  </SelectItem>
+                                              ))}
+                                        <SelectItem value={CUSTOM_SOURCE}>
+                                            Lainnya…
+                                        </SelectItem>
                                     </SelectContent>
                                 </Select>
                             </Field>
 
+                            {sourcePick === CUSTOM_SOURCE ? (
+                                <Field
+                                    id="custom-source"
+                                    label="Sebutkan asalnya"
+                                    optional
+                                    className="sm:col-span-2"
+                                    hint="Konten yang belum ada di kalender, atau jalur lain yang belum tercatat."
+                                >
+                                    <Input
+                                        id="custom-source"
+                                        value={customSource}
+                                        onChange={(event) =>
+                                            setCustomSource(event.target.value)
+                                        }
+                                        placeholder="Webinar Coretax, Mei 2026"
+                                        autoFocus
+                                        aria-describedby="custom-source-hint"
+                                    />
+                                </Field>
+                            ) : null}
+
                             <Field
                                 id="entry"
-                                label="Tanggal masuk"
+                                label={
+                                    creatingClient
+                                        ? 'Client sejak'
+                                        : 'Tanggal masuk'
+                                }
                                 className="sm:col-span-2"
                                 error={errors.entered_at}
                             >
@@ -736,7 +867,9 @@ export function LeadForm({
                                 hint={
                                     lead
                                         ? 'Mengubah tahap di sini mencatat perpindahan hari ini.'
-                                        : 'Biasanya Lead. Naikkan kalau sudah pernah dihubungi.'
+                                        : creatingClient
+                                          ? 'Kerja samanya sudah berjalan, jadi langsung Client aktif. Turunkan kalau ternyata masih proses.'
+                                          : 'Biasanya Lead. Naikkan kalau sudah pernah dihubungi.'
                                 }
                             >
                                 <Select value={stage} onValueChange={setStage}>
@@ -831,7 +964,7 @@ export function LeadForm({
                                 </h3>
 
                                 <p className="mt-1 truncate text-xs text-muted-foreground">
-                                    {source || 'Konten belum dipilih'}
+                                    {resolvedSource || 'Konten belum dipilih'}
                                 </p>
 
                                 <p className="mt-3 flex items-center gap-2 border-t border-border pt-2.5 text-xs">
@@ -909,10 +1042,29 @@ export function LeadForm({
                             <p className="mt-4 border-t border-border pt-3.5 text-xs leading-relaxed text-muted-foreground">
                                 {lead
                                     ? 'Perubahan berlaku begitu disimpan, termasuk di papan dan dashboard.'
-                                    : 'Setelah disimpan, lead langsung masuk ke papan dan ikut terhitung di dashboard.'}
+                                    : creatingClient
+                                      ? 'Setelah disimpan, client langsung tampil di daftar Client dan ikut terhitung di dashboard.'
+                                      : 'Setelah disimpan, lead langsung masuk ke papan dan ikut terhitung di dashboard.'}
                             </p>
                         </div>
                     </aside>
+                </div>
+
+                {/* On a phone the save sits where the thumb already is, and
+                    stays there however far down the form has been scrolled. */}
+                <div className="sticky bottom-0 -mx-4 -mb-4 flex gap-2.5 border-t border-border bg-background px-4 pt-3 pb-[max(0.75rem,env(safe-area-inset-bottom))] sm:hidden">
+                    <Button
+                        size="lg"
+                        type="submit"
+                        className="flex-1 shadow-teal"
+                        disabled={saving}
+                    >
+                        <Check strokeWidth={2.5} aria-hidden />
+                        {saveLabel}
+                    </Button>
+                    <Button size="lg" variant="outline" asChild>
+                        <Link href={back}>Batal</Link>
+                    </Button>
                 </div>
             </form>
         </>

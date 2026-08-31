@@ -41,9 +41,11 @@ export function rangeLabel(range: EntryRange) {
 export function DateRangeFilter({
     value,
     onChange,
+    className,
 }: {
     value: EntryRange;
     onChange: (range: EntryRange) => void;
+    className?: string;
 }) {
     const [open, setOpen] = useState(false);
     const active = Boolean(value?.from);
@@ -59,7 +61,8 @@ export function DateRangeFilter({
                 <button
                     type="button"
                     className={cn(
-                        'flex items-center gap-2 rounded-md border px-3 py-2.5 text-[0.8438rem] font-semibold shadow-lift transition-colors',
+                        'flex min-w-0 items-center gap-2 rounded-md border px-3 py-2.5 text-[0.8438rem] font-semibold shadow-lift transition-colors',
+                        className,
                         active
                             ? 'border-primary/40 bg-primary-soft text-primary-deep'
                             : 'border-border bg-card text-secondary-foreground hover:border-primary/35 hover:text-primary-deep',
@@ -71,26 +74,35 @@ export function DateRangeFilter({
                         aria-hidden
                     />
                     <span className="sr-only">Periode lead masuk: </span>
-                    {rangeLabel(value)}
+                    <span className="truncate">{rangeLabel(value)}</span>
                 </button>
             </PopoverTrigger>
 
-            <PopoverContent align="start" className="w-auto p-0">
+            {/* A phone has no room for presets beside the calendar, and often
+                not for both stacked either: the presets pair up, and the sheet
+                scrolls inside whatever height the viewport can give it. */}
+            <PopoverContent
+                align="start"
+                collisionPadding={12}
+                className="max-h-(--radix-popover-content-available-height) w-[calc(100vw-1.5rem)] overflow-y-auto p-0 sm:w-auto"
+            >
                 <div className="flex flex-col sm:flex-row">
                     <div className="flex flex-col gap-1 border-b border-border p-3 sm:w-44 sm:border-r sm:border-b-0">
                         <p className="px-2 pt-1 pb-2 text-[0.6875rem] font-bold tracking-[0.08em] text-muted-foreground uppercase">
                             Periode masuk
                         </p>
-                        {PRESETS.map((preset) => (
-                            <button
-                                key={preset.days}
-                                type="button"
-                                onClick={() => applyPreset(preset.days)}
-                                className="rounded-md px-2 py-2 text-left text-[0.8438rem] font-semibold text-secondary-foreground transition-colors hover:bg-neutral-soft hover:text-primary-deep"
-                            >
-                                {preset.label}
-                            </button>
-                        ))}
+                        <div className="grid grid-cols-2 gap-1 sm:flex sm:flex-col">
+                            {PRESETS.map((preset) => (
+                                <button
+                                    key={preset.days}
+                                    type="button"
+                                    onClick={() => applyPreset(preset.days)}
+                                    className="rounded-md px-2 py-2 text-left text-[0.8438rem] font-semibold text-secondary-foreground transition-colors hover:bg-neutral-soft hover:text-primary-deep"
+                                >
+                                    {preset.label}
+                                </button>
+                            ))}
+                        </div>
                         {active ? (
                             <button
                                 type="button"
@@ -110,7 +122,7 @@ export function DateRangeFilter({
                         ) : null}
                     </div>
 
-                    <div className="w-fit p-3">
+                    <div className="w-fit p-3 max-sm:mx-auto">
                         <Calendar
                             mode="range"
                             numberOfMonths={1}

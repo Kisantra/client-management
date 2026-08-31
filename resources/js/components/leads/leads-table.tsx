@@ -1,7 +1,8 @@
 import { Link } from '@inertiajs/react';
-import { ArrowDown, ArrowUp, ChevronRight } from 'lucide-react';
+import { ChevronRight } from 'lucide-react';
 import { ChannelIcon } from '@/components/leads/channel-icon';
 import { StageMark, StalledMark } from '@/components/leads/stage-mark';
+import { SortHead } from '@/components/sort-head';
 import { CHANNEL_LABELS } from '@/data/dashboard';
 import { entryDate, relativeDays, shortRupiah } from '@/data/leads';
 import type { Lead } from '@/data/leads';
@@ -14,50 +15,6 @@ type Props = {
     sort: LeadSort;
     onSort: (sort: LeadSort) => void;
 };
-
-/** Column heads are the sort control; the toolbar select stays in step with them. */
-function SortHead({
-    label,
-    column,
-    sort,
-    onSort,
-    align = 'left',
-}: {
-    label: string;
-    column: LeadSort;
-    sort: LeadSort;
-    onSort: (sort: LeadSort) => void;
-    align?: 'left' | 'right';
-}) {
-    const active = sort === column;
-
-    return (
-        <th
-            scope="col"
-            aria-sort={active ? 'descending' : 'none'}
-            className={align === 'right' ? 'text-right' : 'text-left'}
-        >
-            <button
-                type="button"
-                onClick={() => onSort(column)}
-                className={`flex w-full items-center gap-1 py-3 pr-4 font-bold uppercase transition-colors hover:text-foreground ${
-                    align === 'right' ? 'justify-end' : ''
-                } ${active ? 'text-foreground' : ''}`}
-            >
-                {label}
-                {active ? (
-                    <ArrowDown className="size-3" strokeWidth={3} aria-hidden />
-                ) : (
-                    <ArrowUp
-                        className="size-3 opacity-0 transition-opacity group-hover/head:opacity-40"
-                        strokeWidth={3}
-                        aria-hidden
-                    />
-                )}
-            </button>
-        </th>
-    );
-}
 
 export function LeadsTable({ rows, sort, onSort }: Props) {
     return (

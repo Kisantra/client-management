@@ -41,7 +41,11 @@ function ClickToPlace({ onPick }: { onPick: (point: OfficePoint) => void }) {
     return null;
 }
 
-export function OfficeMap({
+/**
+ * The map itself. Leaflet reads `window` the moment it is imported, so this
+ * file is only ever loaded in the browser, through office-map.tsx.
+ */
+export default function OfficeMapLeaflet({
     point,
     onChange,
     readOnly = false,
@@ -67,6 +71,9 @@ export function OfficeMap({
                     center={point ? [point.lat, point.lng] : DEFAULT_CENTER}
                     zoom={point ? 16 : DEFAULT_ZOOM}
                     scrollWheelZoom={false}
+                    /* Credited below the map instead: on a phone Leaflet's own
+                       attribution box sat under the placement hint. */
+                    attributionControl={false}
                     className="size-full"
                 >
                     <TileLayer
@@ -102,18 +109,13 @@ export function OfficeMap({
                             strokeWidth={2.5}
                             aria-hidden
                         />
-                        Klik peta untuk menandai lokasi kantor
+                        Klik atau ketuk peta untuk menandai lokasi kantor
                     </p>
                 )}
             </div>
 
-            <div
-                className={cn(
-                    'flex flex-wrap items-center gap-2 text-xs',
-                    readOnly && 'hidden',
-                )}
-            >
-                {point ? (
+            <div className="flex flex-wrap items-center gap-x-2 gap-y-1 text-xs">
+                {readOnly ? null : point ? (
                     <>
                         <span className="inline-flex items-center gap-1.5 rounded-full bg-primary-soft px-2.5 py-1 font-bold text-primary-deep">
                             <MapPin
@@ -147,6 +149,14 @@ export function OfficeMap({
                         kalau perlu digeser sedikit.
                     </span>
                 )}
+                <a
+                    href="https://www.openstreetmap.org/copyright"
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="ml-auto text-[0.6875rem] text-muted-foreground underline decoration-transparent underline-offset-4 transition-colors hover:text-primary-deep hover:decoration-current"
+                >
+                    © OpenStreetMap
+                </a>
             </div>
         </div>
     );

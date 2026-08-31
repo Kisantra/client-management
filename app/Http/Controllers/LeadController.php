@@ -3,9 +3,11 @@
 namespace App\Http\Controllers;
 
 use App\Http\Requests\LeadRequest;
+use App\Models\Content;
 use App\Models\Lead;
 use App\Models\LeadStageEvent;
 use App\Support\Attachments;
+use App\Support\ContentPlan;
 use App\Support\Pipeline;
 use Illuminate\Http\Request;
 use Illuminate\Support\Carbon;
@@ -80,10 +82,15 @@ class LeadController extends Controller
         ]);
     }
 
-    public function create(): Response
+    public function create(Request $request): Response
     {
+        $stage = (string) $request->query('tahap', 'lead');
+
         return Inertia::render('lead-create', [
             'services' => Pipeline::services(),
+            'contents' => $this->contents(),
+            // The Client page opens the form on the last stage: a client that predates the tool.
+            'stage' => in_array($stage, Pipeline::keys(), true) ? $stage : 'lead',
         ]);
     }
 
@@ -151,6 +158,7 @@ class LeadController extends Controller
                     ? null
                     : ['lat' => $lead->office_lat, 'lng' => $lead->office_lng],
                 'closedNote' => $lead->closed_note,
+                'contentId' => $lead->content_id,
             ],
             'timeline' => $this->timeline($lead),
             'notes' => $lead->notes->map(fn ($note) => [
@@ -189,6 +197,7 @@ class LeadController extends Controller
                     : ['lat' => $lead->office_lat, 'lng' => $lead->office_lng],
                 'channel' => $lead->channel,
                 'source' => $lead->source,
+                'contentId' => $lead->content_id,
                 'service' => $lead->service,
                 'value' => $lead->value,
                 'stage' => $lead->stage,
@@ -196,6 +205,7 @@ class LeadController extends Controller
                 'enteredAt' => $lead->entered_at->toDateString(),
             ],
             'services' => Pipeline::services(),
+            'contents' => $this->contents(),
         ]);
     }
 
@@ -232,6 +242,30 @@ class LeadController extends Controller
         $this->toast('Perubahan tersimpan', $lead->displayName().' sudah diperbarui.');
 
         return to_route('leads.show', $lead);
+    }
+
+    /**
+     * What is live on each publishing channel, newest first, so the form
+     * offers the calendar's own pieces and the chain back to them is a link.
+     *
+     * @return array<string, array<int, array{id: int, title: string}>>
+     */
+    private function contents(): array
+    {
+        $grouped = Content::published()
+            ->orderByDesc('published_at')
+            ->orderByDesc('id')
+            ->get(['id', 'title', 'channel'])
+            ->groupBy('channel');
+
+        return collect(ContentPlan::channels())
+            ->mapWithKeys(fn (string $channel) => [
+                $channel => ($grouped[$channel] ?? collect())
+                    ->map(fn (Content $content) => ['id' => $content->id, 'title' => $content->title])
+                    ->values()
+                    ->all(),
+            ])
+            ->all();
     }
 
     /** The filters the list is read through, normalised and safe to trust. */
