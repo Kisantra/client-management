@@ -85,7 +85,12 @@ function buildNav(counts: SharedProps['counts']): NavGroup[] {
                     icon: UsersRound,
                     badge: navCounts.team,
                 },
-                { title: 'Pengaturan', href: editProfile(), icon: Settings },
+                {
+                    title: 'Pengaturan',
+                    href: editProfile(),
+                    icon: Settings,
+                    section: '/settings',
+                },
             ],
         },
     ];
@@ -97,10 +102,20 @@ export function AppSidebar() {
 
     return (
         <Sidebar collapsible="icon" variant="inset">
-            <SidebarHeader>
+            {/*
+             | Three zones, each closed by a hairline: who this is, where you
+             | can go, and who you are. The rail is taller than the list of
+             | places, and without the rules the leftover space read as
+             | something missing rather than as room to spare.
+             */}
+            <SidebarHeader className="border-b border-sidebar-border pb-2">
                 <SidebarMenu>
                     <SidebarMenuItem>
-                        <SidebarMenuButton size="lg" asChild>
+                        <SidebarMenuButton
+                            size="lg"
+                            asChild
+                            className="hover:bg-neutral-soft hover:text-foreground active:bg-neutral-soft"
+                        >
                             <Link href={dashboard()} prefetch>
                                 <AppLogo />
                             </Link>
@@ -109,31 +124,13 @@ export function AppSidebar() {
                 </SidebarMenu>
             </SidebarHeader>
 
-            <SidebarContent className="gap-4">
+            <SidebarContent className="gap-5 pt-2">
                 <NavMain groups={navGroups} />
             </SidebarContent>
 
-            <SidebarFooter>
-                <IntegrationCard />
+            <SidebarFooter className="border-t border-sidebar-border pt-2">
                 <NavUser />
             </SidebarFooter>
         </Sidebar>
-    );
-}
-
-function IntegrationCard() {
-    return (
-        <div className="mx-2 mb-1 rounded-lg bg-ink-panel p-4 text-ink-panel-foreground group-data-[collapsible=icon]:hidden">
-            <p className="text-sm font-bold">Hubungkan Meta &amp; GA4</p>
-            <p className="mt-1 mb-3 text-xs leading-relaxed text-ink-panel-foreground/70">
-                Tarik metrik otomatis, berhenti input manual.
-            </p>
-            <Link
-                href={performance()}
-                className="block rounded-md bg-primary px-3 py-2 text-center text-xs font-bold text-primary-foreground transition-colors hover:bg-primary-deep"
-            >
-                Hubungkan sekarang
-            </Link>
-        </div>
     );
 }

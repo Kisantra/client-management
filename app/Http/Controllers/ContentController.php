@@ -6,7 +6,8 @@ use App\Http\Requests\ContentRequest;
 use App\Models\Content;
 use App\Models\ContentStatusEvent;
 use App\Support\ContentPlan;
-use App\Support\Pipeline;
+use App\Support\Month;
+use App\Support\Period;
 use Carbon\CarbonInterface;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Http\Request;
@@ -27,6 +28,26 @@ class ContentController extends Controller
     /** Leads shown on a piece's page before it points to the full list. */
     private const LEADS_SHOWN = 8;
 
+    /**
+     * The fields the board can stack its columns by. Every one of them is a
+     * property of a piece that a person would sort a wall of cards by; the
+     * board groups the month's rows in the browser, so this list only has to
+     * keep the URL honest.
+     */
+    private const GROUPS = ['status', 'channel', 'pillar', 'type', 'pj'];
+
+    /**
+     * The windows the board offers.
+     *
+     * Content looks forward as well as back — half the calendar has not
+     * happened yet — so the list runs in both directions from today. The
+     * calendar view has no period at all: a calendar is a month, and stepping
+     * months is the only window it can draw.
+     */
+    private const PERIODS = [
+        'bulan-ini', 'bulan-lalu', 'bulan-depan', 'kuartal', 'tahun', 'semua', 'khusus',
+    ];
+
     private const MONTHS = [
         'Januari', 'Februari', 'Maret', 'April', 'Mei', 'Juni',
         'Juli', 'Agustus', 'September', 'Oktober', 'November', 'Desember',
@@ -38,7 +59,17 @@ class ContentController extends Controller
         $month = Carbon::createFromFormat('Y-m-d', $filters['bulan'].'-01')->startOfMonth();
         $today = Carbon::today();
 
-        $matching = $this->matching($filters, $month);
+        /*
+         | Which window the page is standing in depends on which view is
+         | drawing it: the calendar can only ever be one month, the board can
+         | be any stretch. One of the two controls is on screen at a time, and
+         | this is the line that decides which.
+         */
+        $period = $filters['view'] === 'papan'
+            ? Period::from($filters['periode'], $filters['dari'], $filters['sampai'], self::PERIODS, 'bulan-ini')
+            : null;
+
+        $matching = $this->matching($filters, $month, period: $period);
 
         $items = (clone $matching)
             ->withCount([
@@ -48,6 +79,8 @@ class ContentController extends Controller
                     ->where('stage', 'client'),
             ])
             ->orderBy('scheduled_for')
+            /* Within a day, the running order is the posting order. */
+            ->orderByRaw('scheduled_time is null, scheduled_time')
             ->orderBy('id')
             ->get()
             ->map(fn (Content $content) => $content->toRow())
@@ -57,7 +90,7 @@ class ContentController extends Controller
          | Status chips count under every filter except the status itself, so
          | picking one never hides how many sit in the others.
          */
-        $byStatus = $this->matching($filters, $month, except: 'status')
+        $byStatus = $this->matching($filters, $month, except: 'status', period: $period)
             ->selectRaw('status, count(*) as total')
             ->groupBy('status')
             ->toBase()
@@ -73,6 +106,8 @@ class ContentController extends Controller
 
         return Inertia::render('content', [
             'filters' => $filters,
+            /* Null on the calendar, where the month stepper is the window. */
+            'period' => $period?->toArray(),
             'month' => [
                 'key' => $month->format('Y-m'),
                 'label' => self::MONTHS[$month->month - 1].' '.$month->year,
@@ -103,7 +138,6 @@ class ContentController extends Controller
              | and the calendar underneath never re-renders.
              */
             'selected' => fn () => $this->selected($request),
-            'editing' => fn () => $this->editing($request),
         ]);
     }
 
@@ -117,7 +151,7 @@ class ContentController extends Controller
             'bulan' => substr($date, 0, 7),
             'tambah' => 1,
             'tanggal' => $date,
-            ...(in_array($channel, ContentPlan::channels(), true) ? ['channel' => $channel] : []),
+            ...(in_array($channel, ContentPlan::channelKeys(), true) ? ['channel' => $channel] : []),
         ]);
     }
 
@@ -145,7 +179,9 @@ class ContentController extends Controller
         $this->toast(
             $content->title.' tersimpan',
             'Dijadwalkan '.$this->longDate($content->scheduled_for)
-                .' di '.Pipeline::channels()[$content->channel]
+                .' di '.collect($content->channels ?? [])
+                    ->map(fn (string $key) => ContentPlan::channelLabel($key))
+                    ->join(', ', ' dan ')
                 .' · status '.ContentPlan::label($content->status).'.',
         );
 
@@ -187,6 +223,8 @@ class ContentController extends Controller
             'content' => [
                 ...$content->toRow(),
                 'brief' => $content->brief ?: null,
+                'referenceUrl' => $content->reference_url ?: null,
+                'caption' => $content->caption ?: null,
                 'externalId' => $content->external_id ?: null,
             ],
             'events' => $content->statusEvents->map(fn (ContentStatusEvent $event) => [
@@ -212,42 +250,14 @@ class ContentController extends Controller
         ];
     }
 
-    /** Likewise for an existing piece: the calendar, with its form up. */
+    /** Likewise for an existing piece: its panel, already turned to the form. */
     public function edit(Content $content)
     {
         return to_route('content', [
             'bulan' => $content->scheduled_for->format('Y-m'),
-            'ubah' => $content->id,
+            'konten' => $content->id,
+            'ubah' => 1,
         ]);
-    }
-
-    private function editing(Request $request): ?array
-    {
-        $id = (int) $request->query('ubah', 0);
-        $content = $id > 0 ? Content::find($id) : null;
-
-        return $content ? $this->editable($content) : null;
-    }
-
-    /**
-     * The piece as the form starts from it.
-     *
-     * @return array<string, mixed>
-     */
-    private function editable(Content $content): array
-    {
-        return [
-            'id' => $content->id,
-            'title' => $content->title,
-            'channel' => $content->channel,
-            'format' => $content->format,
-            'status' => $content->status,
-            'scheduledFor' => $content->scheduled_for->toDateString(),
-            'publishedAt' => $content->published_at?->toDateString(),
-            'owner' => $content->owner,
-            'brief' => $content->brief,
-            'url' => $content->url,
-        ];
     }
 
     public function update(ContentRequest $request, Content $content)
@@ -306,11 +316,13 @@ class ContentController extends Controller
      */
     private function filters(Request $request): array
     {
-        $channels = ContentPlan::channels();
+        $channels = ContentPlan::channelKeys();
         $statuses = ContentPlan::keys();
 
         $bulan = (string) $request->query('bulan', '');
         $view = (string) $request->query('view', 'kalender');
+        $grup = (string) $request->query('grup', 'status');
+        $periode = (string) $request->query('periode', 'bulan-ini');
         $channel = (string) $request->query('channel', 'semua');
         $status = (string) $request->query('status', 'semua');
         $pj = mb_substr(trim((string) $request->query('pj', '')), 0, 80);
@@ -319,7 +331,9 @@ class ContentController extends Controller
             'bulan' => preg_match('/^\d{4}-(0[1-9]|1[0-2])$/', $bulan) === 1
                 ? $bulan
                 : Carbon::today()->format('Y-m'),
-            'view' => $view === 'daftar' ? 'daftar' : 'kalender',
+            'view' => $view === 'papan' ? 'papan' : 'kalender',
+            // Which field the board stacks its columns by.
+            'grup' => in_array($grup, self::GROUPS, true) ? $grup : 'status',
             'channel' => in_array($channel, $channels, true) ? $channel : 'semua',
             'status' => in_array($status, $statuses, true) ? $status : 'semua',
             'pj' => $pj === '' ? 'semua' : $pj,
@@ -331,6 +345,12 @@ class ContentController extends Controller
             // A URL that asks for the form to open, and on which day.
             'tambah' => $request->query('tambah') === '1' ? '1' : '',
             'tanggal' => $this->date($request->query('tanggal')) ?? '',
+            // A URL that asks for the open piece's form rather than its record.
+            'ubah' => $request->query('ubah') === '1' ? '1' : '',
+            // The stretch the board covers, and the dates a custom one needs.
+            'periode' => $periode,
+            'dari' => $this->date($request->query('dari')) ?? '',
+            'sampai' => $this->date($request->query('sampai')) ?? '',
         ];
     }
 
@@ -340,17 +360,24 @@ class ContentController extends Controller
      * @param  array<string, string>  $filters
      * @return Builder<Content>
      */
-    private function matching(array $filters, Carbon $month, ?string $except = null): Builder
+    private function matching(array $filters, Carbon $month, ?string $except = null, ?Period $period = null): Builder
     {
         return Content::query()
-            ->whereBetween('scheduled_for', [
-                $month->toDateString(),
-                $month->copy()->endOfMonth()->toDateString(),
-            ])
+            ->when(
+                $period === null,
+                fn (Builder $query) => $query->whereBetween('scheduled_for', Month::bounds($month)),
+                fn (Builder $query) => $period->isOpen()
+                    ? $query
+                    : $query->whereBetween('scheduled_for', $period->bounds()),
+            )
             ->when($filters['hari'] !== '', fn (Builder $query) => $query->whereDate('scheduled_for', $filters['hari']))
             ->when(
                 $filters['channel'] !== 'semua',
-                fn (Builder $query) => $query->where('channel', $filters['channel']),
+                /* A piece belongs to every channel it goes out on. */
+                fn (Builder $query) => $query->whereJsonContains(
+                    'channels',
+                    $filters['channel'],
+                ),
             )
             ->when(
                 $except !== 'status' && $filters['status'] !== 'semua',
@@ -369,6 +396,7 @@ class ContentController extends Controller
                 $query->where(fn (Builder $group) => $group
                     ->where('title', 'like', $like)
                     ->orWhere('brief', 'like', $like)
+                    ->orWhere('caption', 'like', $like)
                     ->orWhere('owner', 'like', $like));
             });
     }

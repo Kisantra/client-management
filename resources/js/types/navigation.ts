@@ -13,6 +13,13 @@ export type NavItem = {
     isActive?: boolean;
     /** Count shown at the trailing edge of the nav row. */
     badge?: number;
+    /**
+     * The path this item owns, when it is not the one it links to. Leads
+     * links to /leads and owns everything under it, so it needs nothing here;
+     * Pengaturan links to /settings/profile but owns all of /settings, and
+     * without this it would go dark the moment anyone opened Security.
+     */
+    section?: string;
 };
 
 export type NavGroup = {

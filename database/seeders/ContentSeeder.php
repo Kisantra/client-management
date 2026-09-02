@@ -19,50 +19,87 @@ use Illuminate\Support\Facades\DB;
  */
 class ContentSeeder extends Seeder
 {
-    /** The pieces the sample leads came in from, as LeadSeeder names them. */
+    /**
+     * The pieces the sample leads came in from, as LeadSeeder names them.
+     * Lead channel, shape, pillar, title.
+     */
     private const SOURCES = [
-        ['instagram', 'carousel', 'Batas Lapor SPT Badan'],
-        ['instagram', 'feed', 'Checklist dokumen pajak'],
-        ['tiktok', 'video', '5 Kesalahan Pembukuan UMKM'],
-        ['tiktok', 'video', 'Checklist audit internal'],
-        ['linkedin', 'post', 'PPh 21 karyawan — contoh hitung'],
-        ['linkedin', 'artikel', 'Tax planning untuk PT baru'],
-        ['web', 'artikel', 'Insentif pajak 2026'],
-        ['web', 'artikel', 'Panduan restitusi PPN'],
-        ['web', 'halaman', 'Syarat pendirian PT 2026'],
+        ['instagram', 'carousel', 'informasi', 'Batas Lapor SPT Badan'],
+        ['instagram', 'single_photo', 'tips', 'Checklist dokumen pajak'],
+        ['tiktok', 'short_video', 'edukasi', '5 Kesalahan Pembukuan UMKM'],
+        ['tiktok', 'short_video', 'tips', 'Checklist audit internal'],
+        ['linkedin', 'single_photo', 'edukasi', 'PPh 21 karyawan — contoh hitung'],
+        ['linkedin', 'artikel', 'edukasi', 'Tax planning untuk PT baru'],
+        ['web', 'artikel', 'informasi', 'Insentif pajak 2026'],
+        ['web', 'artikel', 'edukasi', 'Panduan restitusi PPN'],
+        ['web', 'artikel', 'informasi', 'Syarat pendirian PT 2026'],
     ];
 
+    /** Shape, pillar, title — per the channel the piece leads with. */
     private const TITLES = [
         'instagram' => [
-            ['carousel', '3 tanda pembukuan perlu dirapikan'],
-            ['reels', 'Kapan UMKM wajib jadi PKP?'],
-            ['feed', 'Cara membaca bukti potong'],
-            ['story', 'Jadwal pajak bulan ini'],
-            ['carousel', 'Mitos dan fakta tax planning'],
-            ['reels', 'Arsip faktur pajak tanpa pusing'],
-            ['feed', 'Tanya jawab: SPT Badan'],
+            ['carousel', 'edukasi', '3 tanda pembukuan perlu dirapikan'],
+            ['short_video', 'edukasi', 'Kapan UMKM wajib jadi PKP?'],
+            ['single_photo', 'tips', 'Cara membaca bukti potong'],
+            ['story', 'informasi', 'Jadwal pajak bulan ini'],
+            ['carousel', 'edukasi', 'Mitos dan fakta tax planning'],
+            ['short_video', 'tips', 'Arsip faktur pajak tanpa pusing'],
+            ['single_photo', 'interaksi', 'Tanya jawab: SPT Badan'],
+            ['motion', 'greetings', 'Selamat Hari Raya dari kami'],
+            ['carousel', 'meet_the_team', 'Kenalan dengan tim tax kami'],
+            ['single_photo', 'testimonial', 'Cerita klien: SP2DK selesai rapi'],
         ],
         'tiktok' => [
-            ['video', 'Denda telat lapor SPT'],
-            ['video', 'PPN 12%: apa yang berubah'],
-            ['video', 'Gaji vs THR, pajaknya beda?'],
-            ['story', 'Reminder lapor SPT masa'],
-            ['video', 'Cara hitung PPh final 0,5%'],
+            ['videos', 'informasi', 'Denda telat lapor SPT'],
+            ['short_video', 'informasi', 'PPN 12%: apa yang berubah'],
+            ['short_video', 'edukasi', 'Gaji vs THR, pajaknya beda?'],
+            ['story', 'informasi', 'Reminder lapor SPT masa'],
+            ['videos', 'edukasi', 'Cara hitung PPh final 0,5%'],
         ],
         'linkedin' => [
-            ['post', 'Restitusi PPN: kapan layak diajukan'],
-            ['artikel', 'Audit internal sebelum diperiksa'],
-            ['dokumen', 'Checklist kesiapan Coretax'],
-            ['post', 'Transfer pricing untuk grup kecil'],
-            ['post', 'Studi kasus: SP2DK yang selesai rapi'],
+            ['single_photo', 'edukasi', 'Restitusi PPN: kapan layak diajukan'],
+            ['artikel', 'edukasi', 'Audit internal sebelum diperiksa'],
+            ['carousel', 'tips', 'Checklist kesiapan Coretax'],
+            ['single_photo', 'edukasi', 'Transfer pricing untuk grup kecil'],
+            ['single_photo', 'testimonial', 'Studi kasus: SP2DK yang selesai rapi'],
+            ['carousel', 'employee_engagement', 'Sertifikasi brevet tim kami'],
         ],
         'web' => [
-            ['update', 'Update regulasi: PMK terbaru'],
-            ['halaman', 'Layanan: Payroll & PPh 21'],
-            ['artikel', 'Panduan SP2DK untuk pemilik usaha'],
-            ['artikel', 'Kalender pajak 2026'],
-            ['artikel', 'Pembukuan sederhana untuk CV'],
+            ['artikel', 'informasi', 'Update regulasi: PMK terbaru'],
+            ['artikel', 'informasi', 'Layanan: Payroll & PPh 21'],
+            ['artikel', 'edukasi', 'Panduan SP2DK untuk pemilik usaha'],
+            ['artikel', 'informasi', 'Kalender pajak 2026'],
+            ['artikel', 'edukasi', 'Pembukuan sederhana untuk CV'],
         ],
+    ];
+
+    /**
+     * Who a piece is cross-posted to besides the channel it leads with.
+     * A carousel written for Instagram goes to Facebook with no extra work;
+     * an article does not go to TikTok. Kept sparse, because most pieces
+     * really do go out in one place.
+     */
+    private const ALSO = [
+        'instagram' => ['facebook', 'twitter'],
+        'tiktok' => ['instagram'],
+        'linkedin' => ['twitter'],
+        'web' => ['linkedin'],
+    ];
+
+    /** Sample copy, so the panel has something to show under "Text copy". */
+    private const CAPTIONS = [
+        "Batas lapor SPT tinggal hitung hari. Siapkan dokumennya dari sekarang biar tidak buru-buru di akhir.\n\nButuh bantuan? DM kami.\n\n#pajak #spt #konsultanpajak",
+        "Pembukuan rapi bukan soal software mahal, tapi soal kebiasaan mencatat tiap hari.\n\nSwipe untuk 3 tandanya 👉\n\n#pembukuan #umkm #keuangan",
+        "Banyak yang tanya soal ini, jadi kami rangkum jadi satu.\n\nAda yang mau ditambahkan? Tulis di komentar.\n\n#tanyapajak #edukasipajak",
+    ];
+
+    /** Where the material came from — a real page the writer worked off. */
+    private const REFERENCES = [
+        'https://www.pajak.go.id/id/peraturan',
+        'https://jdih.kemenkeu.go.id/',
+        'https://www.pajak.go.id/id/artikel',
+        null,
+        null,
     ];
 
     private const TEAM = ['Dimas', 'Sari', 'Putri', 'Bayu', 'Andre'];
@@ -98,19 +135,23 @@ class ContentSeeder extends Seeder
     {
         $start = Carbon::parse('2025-02-10');
 
-        foreach (self::SOURCES as $index => [$channel, $format, $title]) {
+        foreach (self::SOURCES as $index => [$channel, $type, $pillar, $title]) {
             $date = $start->copy()->addDays($index * 9 + $this->int(4));
 
             $this->persist([
                 'title' => $title,
-                'channel' => $channel,
-                'format' => $format,
+                'channels' => $this->spread($channel),
+                'pillar' => $pillar,
+                'type' => $type,
                 'status' => Content::PUBLISHED,
                 'scheduled_for' => $date,
+                'scheduled_time' => $this->slot(),
                 'published_at' => $date,
                 'status_changed_at' => $date,
                 'owner' => $this->pick(self::TEAM),
                 'brief' => $this->pick(self::BRIEFS),
+                'caption' => $this->pick(self::CAPTIONS),
+                'reference_url' => $this->pick(self::REFERENCES),
                 'url' => $this->url($channel, $title),
             ]);
         }
@@ -125,7 +166,7 @@ class ContentSeeder extends Seeder
      */
     private function seedCalendar(): void
     {
-        $channels = ContentPlan::channels();
+        $channels = array_keys(self::TITLES);
         $cursor = $this->today->copy()->startOfWeek()->subWeeks(9);
         $end = $this->today->copy()->startOfWeek()->addWeeks(3);
         $used = [];
@@ -136,7 +177,7 @@ class ContentSeeder extends Seeder
             for ($i = 0; $i < $count; $i++) {
                 $channel = $channels[($i + $this->int(2)) % count($channels)];
                 $pool = self::TITLES[$channel];
-                [$format, $title] = $pool[($used[$channel] ?? 0) % count($pool)];
+                [$type, $pillar, $title] = $pool[($used[$channel] ?? 0) % count($pool)];
                 $used[$channel] = ($used[$channel] ?? 0) + 1;
 
                 // Weekdays only; nobody schedules a post for Sunday.
@@ -146,14 +187,18 @@ class ContentSeeder extends Seeder
 
                 $this->persist([
                     'title' => $title,
-                    'channel' => $channel,
-                    'format' => $format,
+                    'channels' => $this->spread($channel),
+                    'pillar' => $pillar,
+                    'type' => $type,
                     'status' => $status,
                     'scheduled_for' => $date,
+                    'scheduled_time' => $this->slot(),
                     'published_at' => $status === Content::PUBLISHED ? $date : null,
                     'status_changed_at' => $changed,
                     'owner' => $this->pick(self::TEAM),
                     'brief' => $this->pick(self::BRIEFS),
+                    'caption' => $this->pick(self::CAPTIONS),
+                    'reference_url' => $this->pick(self::REFERENCES),
                     'url' => $status === Content::PUBLISHED ? $this->url($channel, $title) : null,
                 ]);
             }
@@ -231,15 +276,31 @@ class ContentSeeder extends Seeder
     {
         $published = Content::published()
             ->orderBy('published_at')
-            ->get(['id', 'channel', 'title'])
-            ->unique(fn (Content $content) => $content->channel.'|'.$content->title);
+            ->get(['id', 'channels', 'title'])
+            ->unique(fn (Content $content) => $content->channels[0].'|'.$content->title);
 
         foreach ($published as $content) {
             Lead::whereNull('content_id')
-                ->where('channel', $content->channel)
+                ->where('channel', $content->channels[0])
                 ->where('source', $content->title)
                 ->update(['content_id' => $content->id]);
         }
+    }
+
+    /**
+     * The channel a piece leads with, plus the odd cross-post.
+     *
+     * @return array<int, string>
+     */
+    private function spread(string $channel): array
+    {
+        $also = self::ALSO[$channel] ?? [];
+
+        if ($also === [] || $this->next() < 0.65) {
+            return [$channel];
+        }
+
+        return [$channel, $also[$this->int(count($also))]];
     }
 
     private function url(string $channel, string $title): string
@@ -273,6 +334,19 @@ class ContentSeeder extends Seeder
      * @param  array<int, T>  $options
      * @return T
      */
+    /**
+     * The hour a piece goes out.
+     *
+     * Real teams publish at set hours, and one piece in six has no hour agreed
+     * yet — a state the calendar has to be able to show.
+     */
+    private function slot(): ?string
+    {
+        $slots = ['07:00', '09:00', '12:00', '17:00', '19:00'];
+
+        return $this->int(6) === 0 ? null : $slots[$this->int(count($slots))];
+    }
+
     private function pick(array $options): mixed
     {
         return $options[$this->int(count($options))];

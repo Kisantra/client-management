@@ -12,7 +12,13 @@ const prefersReducedMotion = () =>
  * Rendering is client-only in this app, so starting at zero costs no hydration
  * mismatch.
  */
-export function useCountUp(target: number, delay = 0, duration = 900) {
+export function useCountUp(
+    target: number,
+    delay = 0,
+    duration = 900,
+    /** Decimals to keep while counting. A rate would otherwise sit at 0. */
+    precision = 0,
+) {
     const [reduced] = useState(prefersReducedMotion);
     const [value, setValue] = useState(() => (reduced ? target : 0));
 
@@ -33,7 +39,7 @@ export function useCountUp(target: number, delay = 0, duration = 900) {
             // Exponential ease-out: fast arrival, quiet settle.
             const eased = 1 - Math.pow(1 - progress, 3);
 
-            setValue(Math.round(target * eased));
+            setValue(Number((target * eased).toFixed(precision)));
 
             if (progress < 1) {
                 frame = requestAnimationFrame(tick);
@@ -62,7 +68,7 @@ export function useCountUp(target: number, delay = 0, duration = 900) {
             window.clearTimeout(settle);
             cancelAnimationFrame(frame);
         };
-    }, [target, delay, duration, reduced]);
+    }, [target, delay, duration, precision, reduced]);
 
     return reduced ? target : value;
 }

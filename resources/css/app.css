@@ -54,6 +54,10 @@
     /* Publishing channels, each in its own tint: the calendar reads by platform. */
     --color-channel-instagram: var(--channel-instagram);
     --color-channel-instagram-foreground: var(--channel-instagram-foreground);
+    --color-channel-facebook: var(--channel-facebook);
+    --color-channel-facebook-foreground: var(--channel-facebook-foreground);
+    --color-channel-twitter: var(--channel-twitter);
+    --color-channel-twitter-foreground: var(--channel-twitter-foreground);
     --color-channel-tiktok: var(--channel-tiktok);
     --color-channel-tiktok-foreground: var(--channel-tiktok-foreground);
     --color-channel-linkedin: var(--channel-linkedin);
@@ -129,7 +133,11 @@
 
     --channel-instagram: #fce8f1;
     --channel-instagram-foreground: #9d1f57;
-    --channel-tiktok: #e8eef0;
+    --channel-facebook: #e3ebfb;
+    --channel-facebook-foreground: #1a3a8f;
+    --channel-twitter: #e2e3e8;
+    --channel-twitter-foreground: #1c1d21;
+    --channel-tiktok: #daeff2;
     --channel-tiktok-foreground: #14232b;
     --channel-linkedin: #e4eefa;
     --channel-linkedin-foreground: #0b4f8c;
@@ -193,7 +201,11 @@
 
     --channel-instagram: #3a1a2a;
     --channel-instagram-foreground: #f5a3c7;
-    --channel-tiktok: #1d2a30;
+    --channel-facebook: #16244a;
+    --channel-facebook-foreground: #a8c1f5;
+    --channel-twitter: #26282e;
+    --channel-twitter-foreground: #d9dbe1;
+    --channel-tiktok: #16323a;
     --channel-tiktok-foreground: #cfe3ea;
     --channel-linkedin: #16283d;
     --channel-linkedin-foreground: #9cc5f2;

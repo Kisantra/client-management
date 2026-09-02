@@ -1,15 +1,14 @@
 import { Link } from '@inertiajs/react';
 import type { InertiaLinkProps } from '@inertiajs/react';
 import { ChevronRight } from 'lucide-react';
-import { CHANNEL_TONE } from '@/components/content/channel-tone';
+import { ChannelMarks } from '@/components/content/channel-marks';
 import {
     LateMark,
     STATUS_DOT,
     StatusPill,
 } from '@/components/content/status-mark';
-import { ChannelIcon } from '@/components/leads/channel-icon';
 import type { ContentRow } from '@/data/content';
-import { dayLabel } from '@/data/content';
+import { dayLabel, timeLabel } from '@/data/content';
 import { CHANNEL_LABELS } from '@/data/dashboard';
 import { cn } from '@/lib/utils';
 
@@ -99,23 +98,35 @@ function AgendaRow({ item, href }: { item: ContentRow; href: Href }) {
                 aria-hidden
             />
 
+            {/* A day read as a list is a running order, so the hour leads it.
+                The slot holds its width either way, so titles stay aligned. */}
+            <span
+                className={cn(
+                    'w-11 shrink-0 text-xs font-bold tabular-nums',
+                    item.scheduledTime
+                        ? 'text-secondary-foreground'
+                        : 'text-muted-foreground',
+                )}
+                data-numeric
+            >
+                {timeLabel(item.scheduledTime) ?? '—'}
+            </span>
+
             <span className="min-w-0 flex-1">
                 <span className="block truncate text-[0.8438rem] font-bold">
                     {item.title}
                 </span>
                 <span className="mt-0.5 flex flex-wrap items-center gap-x-2 gap-y-0.5 text-xs text-muted-foreground">
+                    {/* One channel is worth naming; a set of them is already
+                        said by its marks, and the words would crowd the row. */}
                     <span className="inline-flex items-center gap-1">
-                        <ChannelIcon
-                            channel={item.channel}
-                            className={cn(
-                                'size-3',
-                                CHANNEL_TONE[item.channel].text,
-                            )}
-                        />
-                        {CHANNEL_LABELS[item.channel]}
+                        <ChannelMarks channels={item.channels} />
+                        {item.channels.length === 1
+                            ? CHANNEL_LABELS[item.channels[0]]
+                            : null}
                     </span>
                     <span aria-hidden>·</span>
-                    <span>{item.formatLabel}</span>
+                    <span>{item.typeLabel}</span>
                     <span aria-hidden>·</span>
                     <span>{item.owner ?? 'Belum ada PJ'}</span>
                     {item.leads ? (

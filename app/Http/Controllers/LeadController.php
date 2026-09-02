@@ -252,15 +252,18 @@ class LeadController extends Controller
      */
     private function contents(): array
     {
-        $grouped = Content::published()
+        $published = Content::published()
             ->orderByDesc('published_at')
             ->orderByDesc('id')
-            ->get(['id', 'title', 'channel'])
-            ->groupBy('channel');
+            ->get(['id', 'title', 'channels']);
 
-        return collect(ContentPlan::channels())
+        /* A piece cross-posted to three channels is offered under all three:
+           the lead came in from one of them, and which one is the question
+           this list exists to answer. */
+        return collect(ContentPlan::channelKeys())
             ->mapWithKeys(fn (string $channel) => [
-                $channel => ($grouped[$channel] ?? collect())
+                $channel => $published
+                    ->filter(fn (Content $content) => in_array($channel, $content->channels ?? [], true))
                     ->map(fn (Content $content) => ['id' => $content->id, 'title' => $content->title])
                     ->values()
                     ->all(),

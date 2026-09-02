@@ -7,7 +7,13 @@
  */
 
 export type ChannelKey =
-    'instagram' | 'tiktok' | 'linkedin' | 'web' | 'whatsapp';
+    | 'instagram'
+    | 'facebook'
+    | 'twitter'
+    | 'tiktok'
+    | 'linkedin'
+    | 'web'
+    | 'whatsapp';
 
 export type TaskState = 'running' | 'late' | 'waiting' | 'done';
 
@@ -42,6 +48,8 @@ export type TeamMember = {
 
 export const CHANNEL_LABELS: Record<ChannelKey, string> = {
     instagram: 'Instagram',
+    facebook: 'Facebook',
+    twitter: 'Twitter',
     tiktok: 'TikTok',
     linkedin: 'LinkedIn',
     web: 'Web/SEO',

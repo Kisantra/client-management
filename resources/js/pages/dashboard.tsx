@@ -1,6 +1,8 @@
 import { Head, Link, usePage } from '@inertiajs/react';
 import { Plus, Upload } from 'lucide-react';
 import { ChannelTable } from '@/components/dashboard/channel-table';
+import { ContentQueue } from '@/components/dashboard/content-queue';
+import type { Queue } from '@/components/dashboard/content-queue';
 import { LeadChart } from '@/components/dashboard/lead-chart';
 import type { LeadMonth } from '@/components/dashboard/lead-chart';
 import { Panel } from '@/components/dashboard/panel';
@@ -11,11 +13,9 @@ import type {
 } from '@/components/dashboard/pipeline-list';
 import { StatTile } from '@/components/dashboard/stat-tile';
 import { MiniBars, MiniLine, MiniRing } from '@/components/dashboard/stat-viz';
-import { TaskList } from '@/components/dashboard/task-list';
 import { TeamLoad } from '@/components/dashboard/team-load';
 import { Button } from '@/components/ui/button';
-import { todayTasks } from '@/data/dashboard';
-import { clients, content, dashboard, leads, tasks } from '@/routes';
+import { clients, content, dashboard, leads } from '@/routes';
 import { create as leadsCreate } from '@/routes/leads';
 
 const today = new Intl.DateTimeFormat('id-ID', {
@@ -25,10 +25,10 @@ const today = new Intl.DateTimeFormat('id-ID', {
     year: 'numeric',
 }).format(new Date());
 
-const lateCount = todayTasks.filter((task) => task.state === 'late').length;
-
 type Props = {
     pipeline: PipelineStage[];
+    /** What the content calendar owes this week. */
+    queue: Queue;
     summary: {
         leads: {
             value: number;
@@ -71,12 +71,56 @@ function greeting(hour: number) {
     return 'Selamat malam';
 }
 
+/**
+ * The line under the queue, always present so it pins.
+ *
+ * A panel in a two-column row keeps the height of whatever stands beside it,
+ * and a list that ends early leaves that height as a hole. Closing it with a
+ * summary turns the hole into a margin.
+ */
+function QueueFooter({ queue }: { queue: Queue }) {
+    return (
+        <p className="flex flex-wrap items-center gap-x-1.5 text-xs leading-relaxed text-muted-foreground">
+            {queue.rest > 0 ? (
+                <>
+                    <span
+                        className="font-bold text-secondary-foreground"
+                        data-numeric
+                    >
+                        {queue.rest}
+                    </span>{' '}
+                    konten lain di antrean —{' '}
+                    <Link
+                        href={content()}
+                        prefetch
+                        className="font-bold text-primary-deep underline decoration-transparent underline-offset-4 transition-colors hover:decoration-current"
+                    >
+                        lihat semuanya di kalender
+                    </Link>
+                </>
+            ) : (
+                <>
+                    <span
+                        className="font-bold text-secondary-foreground"
+                        data-numeric
+                    >
+                        {queue.planned}
+                    </span>{' '}
+                    konten dijadwalkan minggu ini. Yang lewat tanggal tayang
+                    tetap muncul di sini sampai ditayangkan.
+                </>
+            )}
+        </p>
+    );
+}
+
 export default function Dashboard({
     pipeline,
     summary: figures,
     monthlyLeads,
     monthlyClients,
     closed,
+    queue,
 }: Props) {
     const { auth } = usePage().props;
     const firstName = auth.user?.name?.split(' ')[0] ?? '';
@@ -100,16 +144,19 @@ export default function Dashboard({
                         </h1>
                         <p className="mt-1 flex flex-wrap items-center gap-x-1.5 gap-y-1 text-sm text-muted-foreground">
                             <span>
-                                {today} · {todayTasks.length} tugas hari ini
+                                {today} ·{' '}
+                                <span data-numeric>{queue.planned}</span> konten
+                                minggu ini
                             </span>
-                            {lateCount > 0 ? (
+                            {queue.late > 0 ? (
                                 <span className="font-semibold text-destructive">
-                                    · {lateCount} terlambat
+                                    · <span data-numeric>{queue.late}</span>{' '}
+                                    terlambat
                                 </span>
                             ) : null}
                             <span
                                 className="rounded-full bg-neutral-soft px-2 py-0.5 text-[0.6875rem] font-bold tracking-[0.06em] text-secondary-foreground uppercase"
-                                title="Angka lead dan client sudah dari data yang tersimpan. Konten, tugas, dan beban tim masih contoh — modulnya belum dibangun."
+                                title="Angka lead, client, dan konten sudah dari data yang tersimpan. Tugas dan beban tim masih contoh — modulnya belum dibangun."
                             >
                                 Sebagian contoh
                             </span>
@@ -249,19 +296,28 @@ export default function Dashboard({
                         <LeadChart months={monthlyLeads} />
                     </Panel>
 
+                    {/*
+                     | The morning question, answered from the calendar this
+                     | app actually keeps rather than from a task module that
+                     | has no model behind it. The footer is pinned, so the
+                     | height this row obliges the panel to keep reads as a
+                     | margin under a summary instead of a hole under a list.
+                     */}
                     <Panel
-                        title="Tugas hari ini"
+                        title="Konten minggu ini"
                         className="order-1 xl:order-2"
+                        bodyClassName="flex-1"
                         action={
                             <Link
-                                href={tasks()}
+                                href={content()}
                                 className="shrink-0 rounded-md bg-primary-soft px-3 py-1.5 text-sm font-bold text-primary-deep transition-colors hover:bg-accent"
                             >
-                                Lihat semua
+                                Buka kalender
                             </Link>
                         }
+                        footer={<QueueFooter queue={queue} />}
                     >
-                        <TaskList />
+                        <ContentQueue queue={queue} />
                     </Panel>
                 </div>
 

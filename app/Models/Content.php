@@ -24,10 +24,26 @@ class Content extends Model
     protected function casts(): array
     {
         return [
+            'channels' => 'array',
             'scheduled_for' => 'date',
             'published_at' => 'date',
             'status_changed_at' => 'date',
         ];
+    }
+
+    /**
+     * The hour a piece goes out, in one form the whole app agrees on: 09:00.
+     *
+     * Null when nobody has decided one — a real state, not a missing value, so
+     * it is never filled in with a default that would read as a plan.
+     */
+    public function scheduledTime(): ?string
+    {
+        if (! $this->scheduled_time) {
+            return null;
+        }
+
+        return Carbon::parse($this->scheduled_time)->format('H:i');
     }
 
     /**
@@ -116,12 +132,15 @@ class Content extends Model
         return [
             'id' => $this->id,
             'title' => $this->title,
-            'channel' => $this->channel,
-            'format' => $this->format,
-            'formatLabel' => ContentPlan::formatLabel($this->channel, $this->format),
+            'channels' => $this->channels ?? [],
+            'pillar' => $this->pillar,
+            'pillarLabel' => ContentPlan::pillarLabel($this->pillar),
+            'type' => $this->type,
+            'typeLabel' => ContentPlan::typeLabel($this->type),
             'status' => $this->status,
             'statusLabel' => ContentPlan::label($this->status),
             'scheduledFor' => $this->scheduled_for->toDateString(),
+            'scheduledTime' => $this->scheduledTime(),
             'publishedAt' => $this->published_at?->toDateString(),
             'owner' => $this->owner ?: null,
             'url' => $this->url ?: null,

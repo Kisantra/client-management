@@ -1,11 +1,11 @@
 import { Link } from '@inertiajs/react';
 import type { InertiaLinkProps } from '@inertiajs/react';
 import { Plus } from 'lucide-react';
+import { ChannelMarks, channelNames } from '@/components/content/channel-marks';
 import { CHANNEL_TONE } from '@/components/content/channel-tone';
-import { ChannelIcon } from '@/components/leads/channel-icon';
+import { STATUS_DOT } from '@/components/content/status-mark';
 import type { ContentMonth, ContentRow } from '@/data/content';
 import { toIso } from '@/data/content';
-import { CHANNEL_LABELS } from '@/data/dashboard';
 import { asDate } from '@/data/leads';
 import { cn } from '@/lib/utils';
 
@@ -180,7 +180,7 @@ function DayCell({
             {rest > 0 ? (
                 <Link
                     href={moreHref(date)}
-                    className="rounded-md px-1.5 py-0.5 text-[0.6875rem] font-bold text-muted-foreground transition-colors hover:bg-neutral-soft hover:text-primary-deep"
+                    className="rounded-sm px-1.5 py-1 text-[0.6875rem] font-bold text-muted-foreground transition-colors hover:bg-neutral-soft hover:text-primary-deep"
                 >
                     +{rest} lagi
                 </Link>
@@ -189,25 +189,63 @@ function DayCell({
     );
 }
 
+/**
+ * One piece in a day cell.
+ *
+ * A cell is 150-odd pixels wide, so everything here fights for the title: the
+ * channels are marks rather than words, and the status is a dot. A piece that
+ * is live settles into its channel's tint; one still owed is a dashed card,
+ * which is what separates the two in grey as well as in colour — the tints
+ * are too close in value to carry a state by themselves.
+ *
+ * A piece on several channels takes the tint of the first: a card striped
+ * three ways reads as decoration, and the marks beside it already say the
+ * rest.
+ */
 function CalendarChip({ item, href }: { item: ContentRow; href: Href }) {
+    const tone = CHANNEL_TONE[item.channels[0] ?? 'instagram'];
+    const published = item.status === 'published' && !item.late;
+
     return (
         <Link
             href={href}
             only={['selected']}
             preserveState
             preserveScroll
-            title={`${item.title} · ${CHANNEL_LABELS[item.channel]} · ${item.statusLabel}${item.late ? ` · telat ${item.daysLate} hari` : ''}`}
+            title={`${item.title} · ${channelNames(item.channels)} · ${item.typeLabel} · ${item.statusLabel}${item.late ? ` · telat ${item.daysLate} hari` : ''}`}
             className={cn(
-                'flex min-w-0 items-center gap-1 rounded-md px-1.5 py-1 text-[0.6875rem] font-bold transition-[filter] hover:brightness-95',
+                'flex min-w-0 items-center gap-1.5 rounded-sm border px-1.5 py-1.5 text-[0.6875rem] leading-none font-bold transition-[background-color,border-color,box-shadow] outline-none focus-visible:ring-2 focus-visible:ring-ring/50',
                 item.late
-                    ? 'bg-destructive-soft text-destructive'
-                    : item.status === 'published'
-                      ? CHANNEL_TONE[item.channel].filled
-                      : CHANNEL_TONE[item.channel].outlined,
+                    ? 'border-destructive/25 bg-destructive-soft text-destructive hover:border-destructive/45'
+                    : published
+                      ? cn('border-transparent hover:shadow-lift', tone.filled)
+                      : 'border-dashed border-muted-foreground/35 bg-card text-foreground hover:border-primary/50 hover:shadow-lift',
             )}
         >
-            <ChannelIcon channel={item.channel} className="size-3 shrink-0" />
+            {/* Off its own bed the marks have to carry the channels alone, so
+                they take the channel's ink rather than the card's. */}
+            <span className="flex shrink-0 items-center gap-0.5">
+                <ChannelMarks
+                    channels={item.channels}
+                    tinted={!published && !item.late}
+                    max={2}
+                />
+            </span>
+
             <span className="truncate">{item.title}</span>
+
+            {/* Only what is still owed carries a status; late says it in red.
+                Full-size, because the draft tone is pale enough that a smaller
+                dot disappears into the card under it. */}
+            {published || item.late ? null : (
+                <span
+                    className={cn(
+                        'ml-auto size-2 shrink-0 rounded-full',
+                        STATUS_DOT[item.status],
+                    )}
+                    aria-hidden
+                />
+            )}
         </Link>
     );
 }

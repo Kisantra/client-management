@@ -3,29 +3,26 @@ import {
     CalendarDays,
     ChevronLeft,
     ChevronRight,
+    Columns3,
     Plus,
-    Rows3,
     Search,
     X,
 } from 'lucide-react';
 import { useRef, useState } from 'react';
 import { ContentAgenda } from '@/components/content/content-agenda';
+import { ContentBoard, GROUPS } from '@/components/content/content-board';
+import type { GroupKey } from '@/components/content/content-board';
 import { ContentCalendar } from '@/components/content/content-calendar';
 import { ContentDialog } from '@/components/content/content-dialog';
 import type { Compose } from '@/components/content/content-dialog';
 import { ContentSheet } from '@/components/content/content-sheet';
 import type { SelectedContent } from '@/components/content/content-sheet';
 import { FilterSelect } from '@/components/filter-select';
+import { PeriodFilter } from '@/components/period-filter';
+import type { Period } from '@/components/period-filter';
 import { Button } from '@/components/ui/button';
-import type {
-    ContentDetail,
-    ContentMonth,
-    ContentRow,
-    EditableContent,
-    StatusCount,
-} from '@/data/content';
+import type { ContentMonth, ContentRow, StatusCount } from '@/data/content';
 import { dayLabel } from '@/data/content';
-import { CHANNEL_LABELS } from '@/data/dashboard';
 import type { ChannelKey } from '@/data/dashboard';
 import { useContentPlan } from '@/hooks/use-content-plan';
 import { cn } from '@/lib/utils';
@@ -33,7 +30,9 @@ import { content as contentIndex } from '@/routes';
 
 type Filters = {
     bulan: string;
-    view: 'kalender' | 'daftar';
+    view: 'kalender' | 'papan';
+    /** Which field the board stacks its columns by. */
+    grup: GroupKey;
     channel: string;
     status: string;
     pj: string;
@@ -43,7 +42,23 @@ type Filters = {
     /** '1' when the URL asks for the form to be open on `tanggal`. */
     tambah: string;
     tanggal: string;
+    /** '1' when the URL asks for the open piece's form, not just its record. */
+    ubah: string;
+    /** The stretch the board covers, and the dates a custom one needs. */
+    periode: string;
+    dari: string;
+    sampai: string;
 };
+
+/** The presets the board offers, in the order it offers them. */
+const PERIODS = [
+    'bulan-ini',
+    'bulan-lalu',
+    'bulan-depan',
+    'kuartal',
+    'tahun',
+    'semua',
+];
 
 type Props = {
     filters: Filters;
@@ -54,13 +69,15 @@ type Props = {
     items: ContentRow[];
     /** The piece whose panel is open, when the URL names one. */
     selected: SelectedContent | null;
-    /** The piece whose form is open, when the URL names one. */
-    editing: EditableContent | null;
+    /** The board's window. Null on the calendar, where the month is it. */
+    period: Period | null;
 };
 
 /** Only the parameters that differ from the default ride in the URL. */
 const DEFAULTS: Record<string, string> = {
     view: 'kalender',
+    grup: 'status',
+    periode: 'bulan-ini',
     channel: 'semua',
     status: 'semua',
     pj: 'semua',
@@ -74,7 +91,7 @@ export default function ContentPage({
     owners,
     items,
     selected,
-    editing,
+    period,
 }: Props) {
     const { channels } = useContentPlan();
 
@@ -87,12 +104,16 @@ export default function ContentPage({
         const next: Record<string, string> = {
             bulan: filters.bulan,
             view: filters.view,
+            grup: filters.grup,
             channel: filters.channel,
             status: filters.status,
             pj: filters.pj,
             q: query,
             telat: filters.telat,
             hari: filters.hari,
+            periode: filters.periode,
+            dari: filters.dari,
+            sampai: filters.sampai,
         };
 
         for (const [key, value] of Object.entries(patch)) {
@@ -133,7 +154,7 @@ export default function ContentPage({
         typing.current = setTimeout(() => go({ q: value }), 350);
     };
 
-    const listView = filters.view === 'daftar';
+    const boardView = filters.view === 'papan';
     const lateOnly = filters.telat === '1';
 
     const hasFilters =
@@ -152,7 +173,15 @@ export default function ContentPage({
                 ...(filters.bulan !== month.current
                     ? { bulan: filters.bulan }
                     : {}),
-                ...(listView ? { view: 'daftar' } : {}),
+                ...(boardView
+                    ? {
+                          view: 'papan',
+                          grup: filters.grup,
+                          periode: filters.periode,
+                          dari: filters.dari,
+                          sampai: filters.sampai,
+                      }
+                    : {}),
             },
             { preserveScroll: true, replace: true },
         );
@@ -180,35 +209,46 @@ export default function ContentPage({
         );
     };
 
-    /* The form dialog. Local state, seeded once from the URL so a link to
-       /content/create or /content/{id}/edit still lands on an open form. */
+    /** The channel a new piece starts on: the one filtered for, else IG. */
+    const seedChannel =
+        filters.channel !== 'semua'
+            ? (filters.channel as ChannelKey)
+            : 'instagram';
+
+    /* The dialog for a new piece. Local state, seeded once from the URL so a
+       link to /content/create still lands on an open form. An existing piece
+       is changed inside its own panel instead. */
     const [compose, setCompose] = useState<Compose | null>(() =>
-        editing
-            ? { mode: 'edit', content: editing }
-            : filters.tambah === '1'
-              ? {
-                    mode: 'create',
-                    scheduledFor: filters.tanggal || month.today,
-                    channel:
-                        filters.channel !== 'semua'
-                            ? (filters.channel as ChannelKey)
-                            : 'instagram',
-                }
-              : null,
+        filters.tambah === '1'
+            ? {
+                  scheduledFor: filters.tanggal || month.today,
+                  channel: seedChannel,
+              }
+            : null,
     );
 
     const openAdd = (date: string) =>
-        setCompose({
-            mode: 'create',
-            scheduledFor: date,
-            channel:
-                filters.channel !== 'semua'
-                    ? (filters.channel as ChannelKey)
-                    : 'instagram',
-        });
+        setCompose({ scheduledFor: date, channel: seedChannel });
 
-    const openEdit = (content: ContentDetail) =>
-        setCompose({ mode: 'edit', content });
+    /** Drops a parameter that asked for a form, once the form is closed. */
+    const tidyUrl = () =>
+        router.get(
+            contentIndex.url({
+                query: {
+                    ...currentQuery(),
+                    ...(selected
+                        ? { konten: String(selected.content.id) }
+                        : {}),
+                },
+            }),
+            {},
+            {
+                only: ['filters'],
+                preserveState: true,
+                preserveScroll: true,
+                replace: true,
+            },
+        );
 
     const closeCompose = (next: boolean) => {
         if (next) {
@@ -217,18 +257,8 @@ export default function ContentPage({
 
         setCompose(null);
 
-        // A URL that asked for the form is cleaned once the form is closed.
-        if (filters.tambah === '1' || editing) {
-            router.get(
-                contentIndex.url({ query: currentQuery() }),
-                {},
-                {
-                    only: ['filters', 'editing'],
-                    preserveState: true,
-                    preserveScroll: true,
-                    replace: true,
-                },
-            );
+        if (filters.tambah === '1') {
+            tidyUrl();
         }
     };
 
@@ -246,7 +276,7 @@ export default function ContentPage({
                 ...(filters.bulan !== month.current
                     ? { bulan: filters.bulan }
                     : {}),
-                view: 'daftar',
+                view: 'papan',
                 hari: date,
                 ...(filters.channel !== 'semua'
                     ? { channel: filters.channel }
@@ -272,10 +302,12 @@ export default function ContentPage({
                                 >
                                     {totals.count}
                                 </span>{' '}
-                                konten {hasFilters ? 'cocok' : 'di'}{' '}
-                                {hasFilters ? 'di ' : ''}
-                                {month.label}
+                                konten{hasFilters ? ' cocok' : ''}
+                                {boardView ? '' : ` di ${month.label}`}
                             </span>
+                            {boardView && period ? (
+                                <span>· {period.label}</span>
+                            ) : null}
                             <span>
                                 ·{' '}
                                 <span
@@ -302,10 +334,9 @@ export default function ContentPage({
                     </div>
 
                     <div className="flex w-full flex-wrap items-center gap-2.5 sm:w-auto">
-                        {/* The grid is reading-width only, so the choice is too. */}
-                        <div className="hidden rounded-md border border-border bg-card p-1 shadow-lift md:flex">
+                        <div className="flex rounded-md border border-border bg-card p-1 shadow-lift">
                             <ViewButton
-                                active={!listView}
+                                active={!boardView}
                                 onClick={() => go({ view: 'kalender' })}
                                 label="Kalender"
                             >
@@ -315,52 +346,75 @@ export default function ContentPage({
                                 />
                             </ViewButton>
                             <ViewButton
-                                active={listView}
-                                onClick={() => go({ view: 'daftar' })}
-                                label="Daftar"
+                                active={boardView}
+                                onClick={() => go({ view: 'papan' })}
+                                label="Papan"
                             >
-                                <Rows3 className="size-4" strokeWidth={2} />
+                                <Columns3 className="size-4" strokeWidth={2} />
                             </ViewButton>
                         </div>
 
-                        <div className="flex flex-1 items-center gap-1 rounded-md border border-border bg-card p-1 shadow-lift sm:flex-none">
-                            <MonthButton
-                                onClick={() =>
-                                    go({ bulan: month.prev, hari: null })
+                        {/* A calendar can only ever draw one month, so it
+                            steps months; a board can cover any stretch, so it
+                            asks for one. One window control at a time, and it
+                            is the view that decides which. */}
+                        {boardView && period ? (
+                            <PeriodFilter
+                                period={period}
+                                options={PERIODS}
+                                className="flex-1 sm:flex-none"
+                                onChange={(next) =>
+                                    go({
+                                        periode: next.periode,
+                                        dari: next.dari ?? null,
+                                        sampai: next.sampai ?? null,
+                                        hari: null,
+                                    })
                                 }
-                                label="Bulan sebelumnya"
-                            >
-                                <ChevronLeft
-                                    className="size-4"
-                                    strokeWidth={2.5}
-                                />
-                            </MonthButton>
-                            <span className="min-w-0 flex-1 truncate px-2 text-center text-[0.8438rem] font-bold sm:min-w-[9rem]">
-                                {month.label}
-                            </span>
-                            <MonthButton
-                                onClick={() =>
-                                    go({ bulan: month.next, hari: null })
-                                }
-                                label="Bulan berikutnya"
-                            >
-                                <ChevronRight
-                                    className="size-4"
-                                    strokeWidth={2.5}
-                                />
-                            </MonthButton>
-                            {filters.bulan !== month.current ? (
-                                <button
-                                    type="button"
+                            />
+                        ) : (
+                            <div className="flex flex-1 items-center gap-1 rounded-md border border-border bg-card p-1 shadow-lift sm:flex-none">
+                                <MonthButton
                                     onClick={() =>
-                                        go({ bulan: month.current, hari: null })
+                                        go({ bulan: month.prev, hari: null })
                                     }
-                                    className="rounded-sm px-2 py-1.5 text-xs font-bold text-primary-deep transition-colors hover:bg-primary-soft"
+                                    label="Bulan sebelumnya"
                                 >
-                                    Bulan ini
-                                </button>
-                            ) : null}
-                        </div>
+                                    <ChevronLeft
+                                        className="size-4"
+                                        strokeWidth={2.5}
+                                    />
+                                </MonthButton>
+                                <span className="min-w-0 flex-1 truncate px-2 text-center text-[0.8438rem] font-bold sm:min-w-[9rem]">
+                                    {month.label}
+                                </span>
+                                <MonthButton
+                                    onClick={() =>
+                                        go({ bulan: month.next, hari: null })
+                                    }
+                                    label="Bulan berikutnya"
+                                >
+                                    <ChevronRight
+                                        className="size-4"
+                                        strokeWidth={2.5}
+                                    />
+                                </MonthButton>
+                                {filters.bulan !== month.current ? (
+                                    <button
+                                        type="button"
+                                        onClick={() =>
+                                            go({
+                                                bulan: month.current,
+                                                hari: null,
+                                            })
+                                        }
+                                        className="rounded-sm px-2 py-1.5 text-xs font-bold text-primary-deep transition-colors hover:bg-primary-soft"
+                                    >
+                                        Bulan ini
+                                    </button>
+                                ) : null}
+                            </div>
+                        )}
 
                         <Button
                             size="lg"
@@ -416,6 +470,20 @@ export default function ContentPage({
                         ))}
                     </div>
 
+                    {/* The board's own control, so it only appears with it. */}
+                    {boardView ? (
+                        <FilterSelect
+                            label="Kelompokkan"
+                            className="w-auto flex-1 sm:flex-none"
+                            value={filters.grup}
+                            onChange={(value) => go({ grup: value })}
+                            options={GROUPS.map((option) => ({
+                                value: option.key,
+                                label: option.label,
+                            }))}
+                        />
+                    ) : null}
+
                     <FilterSelect
                         label="Channel"
                         className="w-auto flex-1 sm:flex-none"
@@ -423,10 +491,9 @@ export default function ContentPage({
                         onChange={(value) => go({ channel: value })}
                         options={[
                             { value: 'semua', label: 'Semua channel' },
-                            ...(channels as ChannelKey[]).map((key) => ({
-                                value: key,
-                                label: CHANNEL_LABELS[key],
-                            })),
+                            ...Object.entries(channels).map(
+                                ([value, label]) => ({ value, label }),
+                            ),
                         ]}
                     />
 
@@ -501,13 +568,13 @@ export default function ContentPage({
                         />
                         Merah
                     </span>{' '}
-                    = lewat tanggal tayang dan belum published. Warna chip
-                    mengikuti channel; chip berisi sudah tayang, chip bergaris
-                    belum. Klik tanggal di kalender untuk menambah konten di
-                    hari itu.
+                    = lewat tanggal tayang dan belum published.{' '}
+                    {boardView
+                        ? 'Seret kartu untuk memindahkannya. Kolom channel hanya bisa dibaca karena satu konten bisa tayang di beberapa channel sekaligus, dan untuk menayangkan buka kontennya.'
+                        : 'Chip berwarna channel berarti sudah tayang; chip bergaris putus berarti belum, dan titik di ujungnya menunjukkan statusnya. Klik tanggal di kalender untuk menambah konten di hari itu.'}
                 </p>
 
-                {items.length === 0 && (hasFilters || listView) ? (
+                {items.length === 0 && (hasFilters || boardView) ? (
                     <section className="min-w-0 rounded-xl border border-border bg-card shadow-lift">
                         <EmptyResult
                             filtered={hasFilters}
@@ -516,14 +583,13 @@ export default function ContentPage({
                             onAdd={() => openAdd(defaultDay)}
                         />
                     </section>
-                ) : listView ? (
-                    <section className="min-w-0 rounded-xl border border-border bg-card p-4 shadow-lift sm:p-5">
-                        <ContentAgenda
-                            items={items}
-                            today={month.today}
-                            hrefFor={hrefFor}
-                        />
-                    </section>
+                ) : boardView ? (
+                    <ContentBoard
+                        items={items}
+                        group={filters.grup}
+                        owners={owners}
+                        hrefFor={hrefFor}
+                    />
                 ) : (
                     <>
                         <div className="hidden md:block">
@@ -561,7 +627,12 @@ export default function ContentPage({
                 selected={selected}
                 open={sheetOpen}
                 onClose={closeSheet}
-                onEdit={openEdit}
+                startInEdit={filters.ubah === '1'}
+                onStopEditing={() => {
+                    if (filters.ubah === '1') {
+                        tidyUrl();
+                    }
+                }}
             />
 
             <ContentDialog

@@ -265,6 +265,14 @@ it('edits a lead and records the move when its stage changes', function () {
 });
 
 it('counts leads for the dashboard from the leads themselves', function () {
+    /*
+     | The tile counts this month, and the helper enters a lead three days
+     | ago, so on the first days of a month every lead here would land in the
+     | previous one and the count would read zero. The clock is pinned mid
+     | month so the test measures the counting, not the calendar.
+     */
+    Carbon::setTestNow('2026-08-20');
+
     lead();
     lead(['company' => 'Bumi Artha', 'stage' => 'client']);
     lead(['company' => 'Nusa Jaya', 'stage' => 'deal', 'stage_changed_at' => Carbon::today()->subDays(9)]);
@@ -279,6 +287,8 @@ it('counts leads for the dashboard from the leads themselves', function () {
             ->has('pipeline', 6)
             ->has('monthlyLeads', 12)
         );
+
+    Carbon::setTestNow();
 });
 
 it('loads more cards into one board column on request', function () {
@@ -483,4 +493,25 @@ it('spends the confirmation on the visit that actually happens', function () {
     $this->withHeaders(inertiaHeaders())
         ->get(route('leads'))
         ->assertJsonMissingPath('flash.toast');
+});
+
+it('still counts the month on the month\'s last day', function () {
+    // The trap: a range ending on the bare date drops everything stored that day.
+    Carbon::setTestNow(Carbon::parse('2026-08-31 09:00:00'));
+
+    $lead = lead(['entered_at' => Carbon::today(), 'stage_changed_at' => Carbon::today()]);
+    $dead = lead(['company' => 'Bumi Artha', 'entered_at' => Carbon::today(), 'stage_changed_at' => Carbon::today()]);
+
+    $this->post(route('leads.closure.store', $dead), ['reason' => 'ditolak']);
+
+    $this->get(route('dashboard'))
+        ->assertInertia(fn ($page) => $page
+            ->where('summary.leads.value', 2)
+            ->where('closed.value', 1)
+            ->where('closed.worstStage', 'Lead')
+        );
+
+    expect($lead->fresh()->entered_at->toDateString())->toBe('2026-08-31');
+
+    Carbon::setTestNow();
 });

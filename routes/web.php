@@ -2,6 +2,7 @@
 
 use App\Http\Controllers\ClientController;
 use App\Http\Controllers\ContentController;
+use App\Http\Controllers\ContentFieldController;
 use App\Http\Controllers\ContentStatusController;
 use App\Http\Controllers\DashboardController;
 use App\Http\Controllers\LeadClosureController;
@@ -9,6 +10,8 @@ use App\Http\Controllers\LeadController;
 use App\Http\Controllers\LeadFollowUpController;
 use App\Http\Controllers\LeadNoteController;
 use App\Http\Controllers\LeadStageController;
+use App\Http\Controllers\PerformanceController;
+use App\Http\Controllers\SocialVideoController;
 use Illuminate\Support\Facades\Route;
 
 Route::inertia('/', 'welcome')->name('home');
@@ -53,8 +56,18 @@ Route::middleware(['auth', 'verified'])->group(function () {
         Route::delete('/', [ContentController::class, 'destroy'])->name('content.destroy');
 
         Route::post('status', [ContentStatusController::class, 'store'])->name('content.status.store');
+        Route::post('field', [ContentFieldController::class, 'store'])->name('content.field.store');
     });
-    Route::inertia('performance', 'performance')->name('performance');
+    Route::get('performance', PerformanceController::class)->name('performance');
+    Route::get('performance/konten', [PerformanceController::class, 'content'])
+        ->name('performance.content');
+    /* One video, copied when somebody asks to watch it. */
+    Route::post('performance/{platform}/{code}/video', [SocialVideoController::class, 'store'])
+        ->whereIn('platform', ['instagram', 'tiktok'])
+        ->name('performance.video');
+
+    Route::post('performance/refresh', [PerformanceController::class, 'refresh'])
+        ->name('performance.refresh');
     Route::inertia('tasks', 'tasks')->name('tasks');
     Route::inertia('team', 'team')->name('team');
 });

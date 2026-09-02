@@ -5,7 +5,9 @@ namespace App\Http\Controllers;
 use App\Models\Content;
 use App\Models\Lead;
 use App\Models\LeadStageEvent;
+use App\Support\Month;
 use App\Support\Pipeline;
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Support\Carbon;
 use Inertia\Inertia;
 use Inertia\Response;
@@ -19,6 +21,9 @@ use Inertia\Response;
  */
 class DashboardController extends Controller
 {
+    /** Rows the queue shows before it points at the calendar for the rest. */
+    private const QUEUE_SHOWN = 7;
+
     private const MONTHS = [
         'Jan', 'Feb', 'Mar', 'Apr', 'Mei', 'Jun',
         'Jul', 'Agu', 'Sep', 'Okt', 'Nov', 'Des',
@@ -59,6 +64,7 @@ class DashboardController extends Controller
             'monthlyLeads' => $this->monthlyLeads(),
             'monthlyClients' => $this->monthlyClients(),
             'closed' => $this->closed($thisMonth),
+            'queue' => $this->queue(),
         ]);
     }
 
@@ -71,7 +77,7 @@ class DashboardController extends Controller
      */
     private function published(Carbon $month): array
     {
-        $range = [$month->toDateString(), $month->copy()->endOfMonth()->toDateString()];
+        $range = Month::bounds($month);
 
         // Weekdays from tomorrow to the month's end, inclusive.
         $left = 0;
@@ -84,6 +90,69 @@ class DashboardController extends Controller
             'value' => Content::published()->whereBetween('scheduled_for', $range)->count(),
             'planned' => Content::whereBetween('scheduled_for', $range)->count(),
             'workingDaysLeft' => $left,
+        ];
+    }
+
+    /**
+     * What the content calendar owes this week.
+     *
+     * The dashboard's job at nine in the morning is to say what is due and
+     * what has slipped, and this is the half of that the app actually knows:
+     * every piece is a real row with a real date, a real owner and a real
+     * status. Late work is included whatever week it was meant for, because a
+     * piece that slipped in March is still owed today.
+     *
+     * @return array<string, mixed>
+     */
+    private function queue(): array
+    {
+        $today = Carbon::today();
+        $week = [$today->copy()->startOfWeek(), $today->copy()->endOfWeek()];
+        /*
+         | A thin week would leave the panel half empty beside the chart it
+         | stands next to, so the queue reaches into the following one and
+         | says where the line is. Filler would be dishonest; the next week's
+         | work is the same question asked one week further out.
+         */
+        $ahead = [$today->copy()->startOfWeek(), $today->copy()->endOfWeek()->addWeek()];
+
+        $items = Content::query()
+            ->where(fn (Builder $query) => $query
+                ->whereBetween('scheduled_for', $ahead)
+                ->orWhere(fn (Builder $late) => $late
+                    ->where('scheduled_for', '<', $today)
+                    ->where('status', '!=', Content::PUBLISHED)))
+            ->orderBy('scheduled_for')
+            ->orderByRaw('scheduled_time is null, scheduled_time')
+            ->orderBy('id')
+            ->get()
+            ->map(fn (Content $content) => [
+                ...$content->toRow(),
+                /*
+                 | Urgency, not clock order: what is already breached reads
+                 | before what is merely coming, and what is done reads last.
+                 */
+                'rank' => match (true) {
+                    $content->isLate() => 0,
+                    $content->isStuck() => 1,
+                    $content->isPublished() => 4,
+                    $content->scheduled_for->gt($week[1]) => 3,
+                    default => 2,
+                },
+            ])
+            ->sortBy('rank')
+            ->values();
+
+        $planned = Content::whereBetween('scheduled_for', $week)->count();
+
+        return [
+            'items' => $items->take(self::QUEUE_SHOWN)->all(),
+            'rest' => max($items->count() - self::QUEUE_SHOWN, 0),
+            'weekLabel' => self::MONTHS[$week[0]->month - 1],
+            'planned' => $planned,
+            'published' => Content::published()->whereBetween('scheduled_for', $week)->count(),
+            'late' => $items->where('late', true)->count(),
+            'stuck' => $items->where('stuck', true)->where('late', false)->count(),
         ];
     }
 
@@ -144,10 +213,7 @@ class DashboardController extends Controller
     private function closed(Carbon $month): array
     {
         $closed = Lead::closed()
-            ->whereBetween('closed_at', [
-                $month->copy()->startOfMonth()->toDateString(),
-                $month->copy()->endOfMonth()->toDateString(),
-            ])
+            ->whereBetween('closed_at', Month::bounds($month))
             ->get(['stage', 'closed_reason']);
 
         $worst = collect(Pipeline::stages())
@@ -203,10 +269,7 @@ class DashboardController extends Controller
 
     private function enteredIn(Carbon $month): int
     {
-        return Lead::whereBetween('entered_at', [
-            $month->copy()->startOfMonth()->toDateString(),
-            $month->copy()->endOfMonth()->toDateString(),
-        ])->count();
+        return Lead::whereBetween('entered_at', Month::bounds($month))->count();
     }
 
     /**

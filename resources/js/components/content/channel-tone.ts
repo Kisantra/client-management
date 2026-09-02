@@ -4,7 +4,8 @@ import type { ChannelKey } from '@/data/dashboard';
  * Each publishing channel in its own tint, so the calendar reads by
  * platform at a glance. The hues are defined once as tokens in app.css
  * (with dark-mode values) and never carry status: whether a piece is live
- * is told by its shape, filled against outlined, and lateness stays red.
+ * is told by its shape — a tinted bed once published, a white card with the
+ * channel mark in its own ink until then — and lateness stays red.
  */
 export const CHANNEL_TONE: Record<
     ChannelKey,
@@ -15,6 +16,18 @@ export const CHANNEL_TONE: Record<
         outlined:
             'border border-channel-instagram-foreground/35 bg-card text-channel-instagram-foreground',
         text: 'text-channel-instagram-foreground',
+    },
+    facebook: {
+        filled: 'bg-channel-facebook text-channel-facebook-foreground',
+        outlined:
+            'border border-channel-facebook-foreground/35 bg-card text-channel-facebook-foreground',
+        text: 'text-channel-facebook-foreground',
+    },
+    twitter: {
+        filled: 'bg-channel-twitter text-channel-twitter-foreground',
+        outlined:
+            'border border-channel-twitter-foreground/35 bg-card text-channel-twitter-foreground',
+        text: 'text-channel-twitter-foreground',
     },
     tiktok: {
         filled: 'bg-channel-tiktok text-channel-tiktok-foreground',

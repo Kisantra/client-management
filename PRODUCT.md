@@ -8,7 +8,7 @@ web
 
 ## Users
 
-Tim digital marketing **in-house** pada sebuah firma konsultan perpajakan & bisnis. Tim berukuran 8–20 orang.
+Tim digital marketing **in-house** pada **Kisantra**, firma konsultan perpajakan & bisnis. Tim berukuran 8–20 orang.
 
 - **Akses tertutup untuk internal saja.** Client firma tidak pernah menyentuh sistem ini: tidak ada portal client, tidak ada share link publik, tidak ada akun eksternal. Semua yang login adalah anggota firma.
 - **Dua situasi pemakaian yang bergantian, bukan terpisah:** aplikasi ini adalah tempat kerja harian tim (buka pagi, lihat yang harus dikerjakan, update status) *sekaligus* alat evaluasi (melihat konten mana yang menghasilkan, siapa mengerjakan apa, client mana yang berjalan).
@@ -45,6 +45,8 @@ Tahap **Konsultasi** adalah bagian nyata dari alur jasa profesional ini dan tida
 
 Ads berbayar (Meta/Google) **tidak** termasuk lingkup yang dikonfirmasi saat ini. Tidak ada asumsi tentang budget, spend, atau ROAS sampai dinyatakan sebaliknya.
 
+**Dashboard sudah membaca konten dari data sungguhan.** Panel "Konten minggu ini" berisi baris asli dari `contents` — yang lewat tanggal tayang, yang tertahan di satu status, dan yang akan tayang — bukan contoh. Task dan beban tim masih contoh karena modulnya belum punya model.
+
 **Volume yang harus ditampung:** ratusan lead per bulan. Daftar dan tabel harus tetap terbaca dan cepat dipakai dalam keadaan padat; pencarian, filter, dan pagination adalah kebutuhan sejak awal, bukan penyempurnaan belakangan.
 
 ## Capabilities and Constraints
@@ -56,13 +58,15 @@ Ads berbayar (Meta/Google) **tidak** termasuk lingkup yang dikonfirmasi saat ini
 3. **Performa & evaluasi konten** — metrik per konten dan per channel, dievaluasi terhadap konten yang diproduksi tim untuk firma.
 4. **Task & workload tim** — assignment, deadline, siapa mengerjakan apa, sebaran beban kerja.
 
-**Sumber data metrik:** input manual dan import CSV pada v1. Struktur data harus dirancang sejak awal agar integrasi API platform bisa ditambahkan belakangan **tanpa migrasi ulang**. Platform mana yang diintegrasikan lebih dulu belum diputuskan.
+**Sumber data metrik:** input manual dan import CSV sebagai dasar. **Instagram sudah tersambung sungguhan** lewat scraper Apify untuk akun firma sendiri (`@kisantra.official`): profil, jumlah pengikut, dan konten terakhir ditarik atas permintaan dan disimpan lengkap di `instagram_profiles`, `instagram_snapshots`, dan `instagram_posts` — termasuk payload mentahnya, supaya pertanyaan baru tidak perlu membayar penarikan ulang. **TikTok juga sudah tersambung** (`@kisantra.official`) lewat satu actor Apify yang mengembalikan akun dan videonya sekaligus; disimpan di `tiktok_profiles`, `tiktok_snapshots`, dan `tiktok_posts`. Tabelnya terpisah dari Instagram karena mata uangnya berbeda — TikTok menghitung share dan simpan, Instagram menghitung play dan reach — dan keduanya bertemu di lapisan penyajian, bukan di lapisan penyimpanan. LinkedIn dan Web/SEO belum punya sumber data. Struktur data harus dirancang sejak awal agar integrasi API platform bisa ditambahkan belakangan **tanpa migrasi ulang**. Platform mana yang diintegrasikan lebih dulu belum diputuskan.
 
 **Bahasa antarmuka:** Bahasa Indonesia untuk navigasi, aksi, label, dan pesan sistem; istilah domain marketing dibiarkan dalam Bahasa Inggris karena itu yang dipakai tim sehari-hari (Reach, Engagement, Pipeline, Lead, Deal, Draft, Published).
 
-**Stack yang sudah terpasang di repo** (bukan keputusan terbuka): Laravel 12 + Inertia, React 19 + TypeScript, Tailwind v4, shadcn/ui (style `new-york`, base color `neutral`), ikon Lucide. Autentikasi sudah lengkap via Fortify termasuk two-factor dan passkeys. Layout app shell (sidebar + header) dan halaman settings sudah ada. Domain model modul Leads sudah berjalan (`leads`, `lead_stage_events`, `lead_notes`, `lead_attachments`, `lead_follow_ups`), dengan tahap, batas mandek, dan aturan dokumen wajib dibaca dari `config/pipeline.php`. Halaman Client membaca lead di tahap Client aktif dari tabel yang sama. Modul Konten sudah berjalan (`contents`, `content_status_events`, dan `leads.content_id` yang menautkan lead ke konten yang membawanya), dengan channel penerbit, format, status, dan batas tertahan dibaca dari `config/content.php`. Modul task dan tim belum punya model sama sekali.
+**Stack yang sudah terpasang di repo** (bukan keputusan terbuka): Laravel 12 + Inertia, React 19 + TypeScript, Tailwind v4, shadcn/ui (style `new-york`, base color `neutral`), ikon Lucide. Autentikasi sudah lengkap via Fortify termasuk two-factor dan passkeys. Layout app shell (sidebar + header) dan halaman settings sudah ada. Domain model modul Leads sudah berjalan (`leads`, `lead_stage_events`, `lead_notes`, `lead_attachments`, `lead_follow_ups`), dengan tahap, batas mandek, dan aturan dokumen wajib dibaca dari `config/pipeline.php`. Halaman Client membaca lead di tahap Client aktif dari tabel yang sama. Modul Konten sudah berjalan (`contents`, `content_status_events`, dan `leads.content_id` yang menautkan lead ke konten yang membawanya), dengan daftar channel penerbit, content pillar, content type, status QA, dan batas tertahan dibaca dari `config/content.php`. Satu konten bisa tayang di beberapa channel sekaligus, jadi `contents.channels` adalah daftar, bukan satu nilai. Modul task dan tim belum punya model sama sekali.
 
 **Status penutup (dikonfirmasi):** selain enam tahap di atas, sebuah lead bisa **berhenti**. Ini bukan tahap ketujuh — lead yang berhenti tetap menyimpan tahap terakhirnya, supaya bisa dibaca di tahap mana lead biasanya gugur. Alasannya dicatat dan dibedakan karena maknanya berbeda: **ditolak** (client bilang tidak), **hilang kontak** (tidak ada kabar — ini juga sinyal soal tim, bukan cuma soal client), dan **belum butuh sekarang** (bisa dihubungi lagi nanti). Lead yang berhenti keluar dari papan, berhenti dihitung mandek, dan bisa dibuka lagi dengan hitungan hari mulai dari nol.
+
+**Cara membaca angka performa (dikonfirmasi oleh data):** sebaran interaksi akun ini sangat timpang — satu konten giveaway menguasai 70% dari seluruh interaksi dua bulan. Karena itu angka utama di halaman Performa adalah **median**, bukan rata-rata, dan rata-ratanya ditampilkan di sebelahnya. Jarak antara keduanya adalah temuannya, bukan gangguan yang perlu disembunyikan.
 
 **Belum diputuskan (jangan diisi dengan tebakan):**
 

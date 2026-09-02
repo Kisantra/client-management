@@ -43,8 +43,24 @@ export function useCurrentUrl(): UseCurrentUrlReturn {
         const urlToCompare = currentUrl ?? currentUrlPath;
         const urlString = toUrl(urlToCheck);
 
-        const comparePath = (path: string): boolean =>
-            startsWith ? urlToCompare.startsWith(path) : path === urlToCompare;
+        /*
+         | A section owns its own path and everything under it, and nothing
+         | else: on /leads/12 the Leads item is the one lit, but a future
+         | /leads-import would be its own place, not a page of Leads. The
+         | separator is what draws that line, so it is always required.
+         */
+        const comparePath = (path: string): boolean => {
+            const section = path.endsWith('/') ? path.slice(0, -1) : path;
+
+            if (!startsWith || section === '') {
+                return section === urlToCompare;
+            }
+
+            return (
+                urlToCompare === section ||
+                urlToCompare.startsWith(`${section}/`)
+            );
+        };
 
         if (!urlString.startsWith('http')) {
             return comparePath(urlString);

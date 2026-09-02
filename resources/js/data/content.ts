@@ -12,13 +12,20 @@ export type ContentStatus = 'draft' | 'review' | 'approved' | 'published';
 export type ContentRow = {
     id: number;
     title: string;
-    channel: ChannelKey;
-    format: string;
-    formatLabel: string;
+    /** Every channel this piece goes out on. */
+    channels: ChannelKey[];
+    /** What the piece is for. Null until someone decides. */
+    pillar: string | null;
+    pillarLabel: string | null;
+    /** The shape it takes: single photo, carousel, short video… */
+    type: string;
+    typeLabel: string;
     status: ContentStatus;
     statusLabel: string;
     /** The day it is meant to go live: YYYY-MM-DD. */
     scheduledFor: string;
+    /** 24-hour "09:00", or null when no hour has been decided. */
+    scheduledTime: string | null;
     /** The day it did, once it has. */
     publishedAt: string | null;
     owner: string | null;
@@ -37,6 +44,10 @@ export type ContentRow = {
 
 export type ContentDetail = ContentRow & {
     brief: string | null;
+    /** Where the material came from — a regulation, an article. */
+    referenceUrl: string | null;
+    /** The copy itself, as it will be posted. */
+    caption: string | null;
     externalId: string | null;
 };
 
@@ -44,13 +55,17 @@ export type ContentDetail = ContentRow & {
 export type EditableContent = {
     id: number;
     title: string;
-    channel: ChannelKey;
-    format: string;
+    channels: ChannelKey[];
+    pillar: string | null;
+    type: string;
     status: ContentStatus;
     scheduledFor: string;
+    scheduledTime: string | null;
     publishedAt: string | null;
     owner: string | null;
     brief: string | null;
+    referenceUrl: string | null;
+    caption: string | null;
     url: string | null;
 };
 
@@ -113,6 +128,11 @@ export function shortDayLabel(iso: string): string {
 }
 
 /** Dates travel as plain calendar days; the server never sees a timezone. */
+/** The hour as the team writes it: 09.00. */
+export function timeLabel(time: string | null): string | null {
+    return time ? time.replace(':', '.') : null;
+}
+
 export function toIso(date: Date): string {
     return [
         date.getFullYear(),

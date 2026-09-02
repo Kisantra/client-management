@@ -11,25 +11,43 @@ namespace App\Support;
  */
 class ContentPlan
 {
-    /** @return array<int, string> */
+    /** @return array<string, string> */
     public static function channels(): array
     {
         return config('content.channels');
     }
 
-    /**
-     * The formats one channel can carry, label by key.
-     *
-     * @return array<string, string>
-     */
-    public static function formats(string $channel): array
+    /** @return array<int, string> */
+    public static function channelKeys(): array
     {
-        return config('content.formats')[$channel] ?? [];
+        return array_keys(self::channels());
     }
 
-    public static function formatLabel(string $channel, string $format): string
+    public static function channelLabel(string $channel): string
     {
-        return self::formats($channel)[$format] ?? $format;
+        return self::channels()[$channel] ?? $channel;
+    }
+
+    /** @return array<string, string> */
+    public static function pillars(): array
+    {
+        return config('content.pillars');
+    }
+
+    public static function pillarLabel(?string $pillar): ?string
+    {
+        return $pillar === null ? null : (self::pillars()[$pillar] ?? $pillar);
+    }
+
+    /** The shapes a piece can take, label by key. @return array<string, string> */
+    public static function types(): array
+    {
+        return config('content.types');
+    }
+
+    public static function typeLabel(string $type): string
+    {
+        return self::types()[$type] ?? $type;
     }
 
     /** @return array<int, array{key: string, label: string, hint: string}> */
@@ -67,7 +85,7 @@ class ContentPlan
 
     /**
      * Everything the browser needs, shared on every page so no screen keeps
-     * its own copy of the channels, formats or statuses.
+     * its own copy of the channels, pillars, types or QA stages.
      *
      * @return array<string, mixed>
      */
@@ -75,7 +93,8 @@ class ContentPlan
     {
         return [
             'channels' => self::channels(),
-            'formats' => config('content.formats'),
+            'pillars' => self::pillars(),
+            'types' => self::types(),
             'statuses' => self::statuses(),
             'stuckAfterDays' => config('content.stuck_after_days'),
         ];

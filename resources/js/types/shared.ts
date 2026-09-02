@@ -39,8 +39,10 @@ export type ContentStatusDef = {
  * copy of which channels publish, what they carry, or the statuses.
  */
 export type SharedContent = {
-    channels: string[];
-    formats: Record<string, Record<string, string>>;
+    /** Key to label, in the order the form should offer them. */
+    channels: Record<string, string>;
+    pillars: Record<string, string>;
+    types: Record<string, string>;
     statuses: ContentStatusDef[];
     stuckAfterDays: Record<string, number>;
 };

@@ -1,5 +1,6 @@
 import { Link, router } from '@inertiajs/react';
 import {
+    BookMarked,
     CalendarDays,
     Check,
     ChevronRight,
@@ -8,13 +9,17 @@ import {
     Link2,
     Loader,
     Pencil,
+    Shapes,
+    Tag,
     Target,
     Trash2,
     UserRound,
     X,
 } from 'lucide-react';
 import { useState } from 'react';
+import { channelNames } from '@/components/content/channel-marks';
 import { CHANNEL_TONE } from '@/components/content/channel-tone';
+import { ContentForm } from '@/components/content/content-form';
 import { DeleteDialog } from '@/components/content/delete-dialog';
 import { PublishDialog } from '@/components/content/publish-dialog';
 import {
@@ -45,6 +50,7 @@ import type {
     ContentEvent,
     ContentStatus,
 } from '@/data/content';
+import { timeLabel } from '@/data/content';
 import { CHANNEL_LABELS } from '@/data/dashboard';
 import type { Lead } from '@/data/leads';
 import { entryDate, longDate, shortRupiah } from '@/data/leads';
@@ -69,18 +75,25 @@ type Tab = 'riwayat' | 'lead';
  * A piece's record, as a card floated in from the right over the calendar
  * it was picked from. The month stays put underneath, lightly dimmed, so
  * reading three pieces in a row is three clicks and no scrolling back.
+ *
+ * Changing a piece happens here too, in place: the record's own card turns
+ * into the form for it and back again. A second window over this one would
+ * have covered the very thing being changed.
  */
 export function ContentSheet({
     selected,
     open,
     onClose,
-    onEdit,
+    startInEdit = false,
+    onStopEditing,
 }: {
     selected: SelectedContent | null;
     open: boolean;
     onClose: () => void;
-    /** Opens the form on this piece, over the panel. */
-    onEdit: (content: ContentDetail) => void;
+    /** True when the URL asked for this piece's form, not just its record. */
+    startInEdit?: boolean;
+    /** Told when the form closes, so the URL that asked for it can be tidied. */
+    onStopEditing?: () => void;
 }) {
     /* The last piece stays on screen while the panel slides out, instead of
        the panel emptying a beat before it leaves. Derived during render, the
@@ -93,13 +106,39 @@ export function ContentSheet({
 
     const shown = selected ?? last;
 
+    /* Which of its two states the card is in. Opening a different piece
+       always lands on its record: an edit begun on one piece must never
+       carry over to the next. */
+    const [editing, setEditing] = useState(startInEdit);
+    const [editingId, setEditingId] = useState(shown?.content.id ?? null);
+
+    if (shown && shown.content.id !== editingId) {
+        setEditingId(shown.content.id);
+        setEditing(startInEdit);
+    }
+
+    const stopEditing = () => {
+        setEditing(false);
+        onStopEditing?.();
+    };
+
     return (
         <Sheet
             open={open}
             onOpenChange={(next) => {
-                if (!next) {
-                    onClose();
+                if (next) {
+                    return;
                 }
+
+                /* Escape backs out of the form first and the panel second, so
+                   a half-written change is never one keystroke from gone. */
+                if (editing) {
+                    stopEditing();
+
+                    return;
+                }
+
+                onClose();
             }}
         >
             <SheetContent
@@ -108,11 +147,32 @@ export function ContentSheet({
                 className="inset-y-3 right-3 h-auto w-[calc(100%-1.5rem)] gap-0 overflow-hidden rounded-xl border-border p-0 shadow-carry sm:inset-y-4 sm:right-4 sm:w-[36rem] sm:max-w-[36rem]"
             >
                 {shown ? (
-                    <Body
-                        key={shown.content.id}
-                        selected={shown}
-                        onEdit={onEdit}
-                    />
+                    editing ? (
+                        <>
+                            {/* The panel is a dialog; it owes a title even when
+                                the form is the thing being shown. */}
+                            <SheetTitle className="sr-only">
+                                Ubah {shown.content.title}
+                            </SheetTitle>
+                            <SheetDescription className="sr-only">
+                                Mengubah rincian konten. Perubahan status dari
+                                sini tercatat di riwayatnya.
+                            </SheetDescription>
+                            <ContentForm
+                                key={`edit-${shown.content.id}`}
+                                content={shown.content}
+                                variant="panel"
+                                onCancel={stopEditing}
+                                onSaved={stopEditing}
+                            />
+                        </>
+                    ) : (
+                        <Body
+                            key={shown.content.id}
+                            selected={shown}
+                            onEdit={() => setEditing(true)}
+                        />
+                    )
                 ) : null}
             </SheetContent>
         </Sheet>
@@ -124,7 +184,8 @@ function Body({
     onEdit,
 }: {
     selected: SelectedContent;
-    onEdit: (content: ContentDetail) => void;
+    /** Turns this card into the form for the piece it is showing. */
+    onEdit: () => void;
 }) {
     const { content, events, leads } = selected;
     const { statuses } = useContentPlan();
@@ -219,7 +280,7 @@ function Body({
                         variant="outline"
                         size="icon"
                         title="Ubah konten"
-                        onClick={() => onEdit(content)}
+                        onClick={onEdit}
                     >
                         <Pencil
                             className="size-4"
@@ -251,8 +312,7 @@ function Body({
                         {content.title}
                     </SheetTitle>
                     <SheetDescription className="sr-only">
-                        {CHANNEL_LABELS[content.channel]} ·{' '}
-                        {content.formatLabel}
+                        {channelNames(content.channels)} · {content.typeLabel}
                     </SheetDescription>
 
                     {/* The record, one fact per line: where it stands, when, who. */}
@@ -284,6 +344,9 @@ function Body({
                             <span className="flex flex-wrap items-center gap-x-2 gap-y-0.5">
                                 <span data-numeric>
                                     {longDate(content.scheduledFor)}
+                                    {content.scheduledTime
+                                        ? `, ${timeLabel(content.scheduledTime)}`
+                                        : ''}
                                 </span>
                                 {content.publishedAt &&
                                 content.publishedAt !== content.scheduledFor ? (
@@ -301,24 +364,44 @@ function Body({
                             </span>
                         </Prop>
 
+                        {/* Here there is room for the words, so every channel
+                            is named rather than left as a mark. */}
                         <Prop icon={Layers} label="Channel">
                             <span className="flex flex-wrap items-center gap-1.5">
-                                <span
-                                    className={cn(
-                                        'inline-flex items-center gap-1.5 rounded-full py-0.5 pr-2.5 pl-1.5 text-xs font-bold',
-                                        CHANNEL_TONE[content.channel].filled,
-                                    )}
-                                >
-                                    <ChannelIcon channel={content.channel} />
-                                    {CHANNEL_LABELS[content.channel]}
-                                </span>
-                                <span className="rounded-full bg-neutral-soft px-2.5 py-0.5 text-xs font-bold text-secondary-foreground">
-                                    {content.formatLabel}
-                                </span>
+                                {content.channels.map((channel) => (
+                                    <span
+                                        key={channel}
+                                        className={cn(
+                                            'inline-flex items-center gap-1.5 rounded-full py-0.5 pr-2.5 pl-1.5 text-xs font-bold',
+                                            CHANNEL_TONE[channel].filled,
+                                        )}
+                                    >
+                                        <ChannelIcon channel={channel} />
+                                        {CHANNEL_LABELS[channel]}
+                                    </span>
+                                ))}
                             </span>
                         </Prop>
 
-                        <Prop icon={UserRound} label="Penanggung jawab">
+                        <Prop icon={Shapes} label="Jenis konten">
+                            <span className="rounded-full bg-neutral-soft px-2.5 py-0.5 text-xs font-bold text-secondary-foreground">
+                                {content.typeLabel}
+                            </span>
+                        </Prop>
+
+                        <Prop icon={Tag} label="Pillar">
+                            {content.pillarLabel ? (
+                                <span className="rounded-full bg-neutral-soft px-2.5 py-0.5 text-xs font-bold text-secondary-foreground">
+                                    {content.pillarLabel}
+                                </span>
+                            ) : (
+                                <span className="font-normal text-muted-foreground">
+                                    Belum ditentukan
+                                </span>
+                            )}
+                        </Prop>
+
+                        <Prop icon={UserRound} label="Submitted by">
                             {content.owner ? (
                                 <span className="inline-flex items-center gap-2">
                                     <span
@@ -369,6 +452,33 @@ function Body({
                             </span>
                         </Prop>
 
+                        <Prop icon={BookMarked} label="Referensi">
+                            {content.referenceUrl ? (
+                                <a
+                                    href={content.referenceUrl}
+                                    target="_blank"
+                                    rel="noopener noreferrer"
+                                    className="inline-flex max-w-full items-center gap-1 text-primary-deep underline decoration-transparent underline-offset-4 transition-colors hover:decoration-current"
+                                >
+                                    <span className="truncate">
+                                        {content.referenceUrl.replace(
+                                            /^https?:\/\/(www\.)?/,
+                                            '',
+                                        )}
+                                    </span>
+                                    <ExternalLink
+                                        className="size-3 shrink-0"
+                                        strokeWidth={2}
+                                        aria-hidden
+                                    />
+                                </a>
+                            ) : (
+                                <span className="font-normal text-muted-foreground">
+                                    Belum ada
+                                </span>
+                            )}
+                        </Prop>
+
                         <Prop icon={Link2} label="Tautan">
                             {content.url ? (
                                 <a
@@ -397,8 +507,23 @@ function Body({
                         </Prop>
                     </dl>
 
+                    {/* The copy as it will be posted, kept apart from the
+                        brief that asked for it: one is the instruction, the
+                        other is the thing itself, and reading them as one
+                        block is how an instruction ends up in a caption. */}
+                    {content.caption ? (
+                        <div className="mt-6 rounded-lg border border-border px-4 py-3.5">
+                            <h3 className="text-[0.8438rem] font-bold">
+                                Text copy
+                            </h3>
+                            <p className="mt-1.5 text-[0.8438rem] leading-relaxed whitespace-pre-line text-secondary-foreground">
+                                {content.caption}
+                            </p>
+                        </div>
+                    ) : null}
+
                     {/* The brief, on a bed of its own: the one block of prose. */}
-                    <div className="mt-6 rounded-lg bg-neutral-soft/70 px-4 py-3.5">
+                    <div className="mt-4 rounded-lg bg-neutral-soft/70 px-4 py-3.5">
                         <h3 className="text-[0.8438rem] font-bold">Brief</h3>
                         {content.brief ? (
                             <p className="mt-1.5 text-[0.8438rem] leading-relaxed whitespace-pre-line text-secondary-foreground">
@@ -409,7 +534,7 @@ function Body({
                                 Belum ada brief.{' '}
                                 <button
                                     type="button"
-                                    onClick={() => onEdit(content)}
+                                    onClick={onEdit}
                                     className="font-bold text-primary-deep underline underline-offset-4"
                                 >
                                     Tulis sekarang
