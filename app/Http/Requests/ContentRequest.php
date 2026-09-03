@@ -31,6 +31,9 @@ class ContentRequest extends FormRequest
             'reference_url' => ['nullable', 'url', 'max:255'],
             'caption' => ['nullable', 'string', 'max:8000'],
             'url' => ['nullable', 'url', 'max:255'],
+
+            // The backlog entry this piece grew out of, when it did.
+            'idea_id' => ['nullable', 'integer', Rule::exists('content_ideas', 'id')],
         ];
     }
 
@@ -55,6 +58,7 @@ class ContentRequest extends FormRequest
     public function columns(): array
     {
         return collect($this->validated())
+            ->except(['idea_id'])
             ->map(fn ($value) => is_string($value) ? trim($value) : $value)
             ->all();
     }

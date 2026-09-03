@@ -4,6 +4,7 @@ namespace App\Http\Controllers;
 
 use App\Http\Requests\ContentRequest;
 use App\Models\Content;
+use App\Models\ContentIdea;
 use App\Models\ContentStatusEvent;
 use App\Support\ContentPlan;
 use App\Support\Month;
@@ -172,6 +173,14 @@ class ContentController extends Controller
                 'author' => $request->user()->name,
                 'at' => $today,
             ]);
+
+            /*
+             | Started from the idea backlog: the idea now points at the piece
+             | it became, so it reads there as done rather than lost.
+             */
+            if ($ideaId = $request->validated('idea_id')) {
+                ContentIdea::whereKey($ideaId)->update(['content_id' => $content->id]);
+            }
 
             return $content;
         });

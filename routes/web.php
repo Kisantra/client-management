@@ -3,6 +3,7 @@
 use App\Http\Controllers\ClientController;
 use App\Http\Controllers\ContentController;
 use App\Http\Controllers\ContentFieldController;
+use App\Http\Controllers\ContentIdeaController;
 use App\Http\Controllers\ContentStatusController;
 use App\Http\Controllers\DashboardController;
 use App\Http\Controllers\LeadClosureController;
@@ -10,6 +11,7 @@ use App\Http\Controllers\LeadController;
 use App\Http\Controllers\LeadFollowUpController;
 use App\Http\Controllers\LeadNoteController;
 use App\Http\Controllers\LeadStageController;
+use App\Http\Controllers\NewsController;
 use App\Http\Controllers\PerformanceController;
 use App\Http\Controllers\SocialVideoController;
 use Illuminate\Support\Facades\Route;
@@ -48,6 +50,17 @@ Route::middleware(['auth', 'verified'])->group(function () {
     Route::get('content', [ContentController::class, 'index'])->name('content');
     Route::post('content', [ContentController::class, 'store'])->name('content.store');
     Route::get('content/create', [ContentController::class, 'create'])->name('content.create');
+
+    Route::get('content/ide', [ContentIdeaController::class, 'index'])->name('content.ideas');
+    Route::post('content/ide', [ContentIdeaController::class, 'store'])->name('content.ideas.store');
+    Route::delete('content/ide/{idea}', [ContentIdeaController::class, 'destroy'])
+        ->whereNumber('idea')
+        ->name('content.ideas.destroy');
+
+    Route::get('content/berita', [NewsController::class, 'index'])->name('content.news');
+    Route::post('content/berita/{news}/ide', [NewsController::class, 'idea'])
+        ->whereNumber('news')
+        ->name('content.news.idea');
 
     Route::prefix('content/{content}')->whereNumber('content')->group(function () {
         Route::get('/', [ContentController::class, 'show'])->name('content.show');

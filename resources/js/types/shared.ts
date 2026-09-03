@@ -53,6 +53,11 @@ export type SharedProps = {
     sidebarOpen: boolean;
     pipeline: SharedPipeline;
     contentPlan: SharedContent;
-    counts: { leads: number; clients: number; content: number } | null;
+    counts: {
+        leads: number;
+        clients: number;
+        content: number;
+        ideas: number;
+    } | null;
     [key: string]: unknown;
 };

@@ -78,8 +78,16 @@ export function ContentForm({
 }: {
     /** The piece being changed, or null to compose a new one. */
     content: EditableContent | null;
-    /** Where a new piece starts: the day clicked, and the channel in filter. */
-    seed?: { scheduledFor: string; channel: ChannelKey };
+    /** Where a new piece starts: the day clicked, the channel in filter —
+     * and, from the idea backlog, the words the idea already has. */
+    seed?: {
+        scheduledFor: string;
+        channel: ChannelKey;
+        title?: string;
+        brief?: string;
+        referenceUrl?: string;
+        ideaId?: number;
+    };
     variant: 'dialog' | 'panel';
     onCancel: () => void;
     onSaved: () => void;
@@ -87,7 +95,7 @@ export function ContentForm({
     const plan = useContentPlan();
     const allChannels = Object.keys(plan.channels) as ChannelKey[];
 
-    const [title, setTitle] = useState(content?.title ?? '');
+    const [title, setTitle] = useState(content?.title ?? seed?.title ?? '');
     const [channels, setChannels] = useState<ChannelKey[]>(
         content?.channels?.length
             ? content.channels
@@ -97,10 +105,10 @@ export function ContentForm({
     const [type, setType] = useState(
         content?.type ?? Object.keys(plan.types)[0] ?? '',
     );
-    const [brief, setBrief] = useState(content?.brief ?? '');
+    const [brief, setBrief] = useState(content?.brief ?? seed?.brief ?? '');
     const [caption, setCaption] = useState(content?.caption ?? '');
     const [referenceUrl, setReferenceUrl] = useState(
-        content?.referenceUrl ?? '',
+        content?.referenceUrl ?? seed?.referenceUrl ?? '',
     );
     const [scheduledFor, setScheduledFor] = useState<Date>(
         asDate(content?.scheduledFor ?? seed?.scheduledFor ?? toIso(TODAY)),
@@ -197,6 +205,7 @@ export function ContentForm({
                 caption: caption.trim(),
                 reference_url: referenceUrl.trim(),
                 url: url.trim(),
+                idea_id: content ? '' : (seed?.ideaId ?? ''),
             },
             {
                 preserveScroll: true,

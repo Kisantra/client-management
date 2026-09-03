@@ -20,6 +20,12 @@ export type NavItem = {
      * without this it would go dark the moment anyone opened Security.
      */
     section?: string;
+    /**
+     * A sub-nav. The item itself becomes the section's toggle, and these
+     * are the places inside it. A child with a `section` owns that path and
+     * everything under it; one without lights only on its exact page.
+     */
+    children?: NavItem[];
 };
 
 export type NavGroup = {

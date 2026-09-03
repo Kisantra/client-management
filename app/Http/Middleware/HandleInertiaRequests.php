@@ -3,6 +3,7 @@
 namespace App\Http\Middleware;
 
 use App\Models\Content;
+use App\Models\ContentIdea;
 use App\Models\Lead;
 use App\Support\ContentPlan;
 use App\Support\Pipeline;
@@ -99,6 +100,8 @@ class HandleInertiaRequests extends Middleware
                 'clients' => Lead::active()->where('stage', 'client')->count(),
                 // Still in production: everything not yet live.
                 'content' => Content::where('status', '!=', Content::PUBLISHED)->count(),
+                // Written down and still waiting for a date.
+                'ideas' => ContentIdea::whereNull('content_id')->count(),
             ] : null,
         ];
     }
