@@ -1,5 +1,6 @@
 <?php
 
+use App\Http\Controllers\BriefController;
 use App\Http\Controllers\ClientController;
 use App\Http\Controllers\ContentController;
 use App\Http\Controllers\ContentFieldController;
@@ -14,9 +15,16 @@ use App\Http\Controllers\LeadStageController;
 use App\Http\Controllers\NewsController;
 use App\Http\Controllers\PerformanceController;
 use App\Http\Controllers\SocialVideoController;
+use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Route;
 
-Route::inertia('/', 'welcome')->name('home');
+/*
+ | The front door. This is an in-house tool with nothing to show a stranger,
+ | so the root is a doorway rather than a page: it sends you to the work if you
+ | are signed in, and to the sign-in screen if you are not.
+ */
+Route::get('/', fn () => redirect()->route(Auth::check() ? 'dashboard' : 'login'))
+    ->name('home');
 
 Route::middleware(['auth', 'verified'])->group(function () {
     Route::get('dashboard', DashboardController::class)->name('dashboard');
@@ -58,6 +66,14 @@ Route::middleware(['auth', 'verified'])->group(function () {
         ->name('content.ideas.destroy');
 
     Route::get('content/berita', [NewsController::class, 'index'])->name('content.news');
+
+    /* The idea route sits above {brief} so a press is never read as a date. */
+    Route::post('content/brief/ide/{briefIdea}', [BriefController::class, 'idea'])
+        ->whereNumber('briefIdea')
+        ->name('content.brief.idea');
+    Route::get('content/brief/{brief?}', [BriefController::class, 'index'])
+        ->whereNumber('brief')
+        ->name('content.brief');
     Route::post('content/berita/{news}/ide', [NewsController::class, 'idea'])
         ->whereNumber('news')
         ->name('content.news.idea');

@@ -10,15 +10,24 @@ import { content as contentIndex } from '@/routes';
 import { ideas as ideasIndex, news as newsIndex } from '@/routes/content';
 import { idea as saveIdea } from '@/routes/content/news';
 
+/** What the feed is allowed to show, so the page can say it out loud. */
+type Window = {
+    /** Zero when the page shows the whole archive rather than a window. */
+    days: number;
+    minScore: number;
+    since: string | null;
+};
+
 type Props = {
     items: NewsRow[];
+    window: Window;
 };
 
 /**
  * The stories the calendar feeds on, newest first, grouped by day. A press
  * on "Jadikan ide" moves one onto the idea backlog and the row remembers it.
  */
-export default function ContentNewsPage({ items }: Props) {
+export default function ContentNewsPage({ items, window }: Props) {
     const [savingId, setSavingId] = useState<number | null>(null);
 
     const today = toIso(TODAY);
@@ -53,17 +62,27 @@ export default function ContentNewsPage({ items }: Props) {
                         <h1 className="text-2xl font-extrabold tracking-[-0.03em] sm:text-[1.5625rem]">
                             Berita Terbaru
                         </h1>
+                        {/* The scope is part of the headline, not a footnote: a feed that
+                            shows a slice of its source without saying so is a feed
+                            that quietly lies about what is happening. */}
                         <p className="mt-1 flex flex-wrap items-center gap-x-1.5 gap-y-1 text-sm text-muted-foreground">
                             <span>
-                                Bahan konten dari regulasi, media, dan
-                                pertanyaan yang masuk.
+                                Bahan konten dari pantauan berita pajak,{' '}
+                                <span className="font-semibold text-foreground">
+                                    {window.days > 0
+                                        ? `${window.days} hari terakhir`
+                                        : 'seluruh arsip'}
+                                </span>{' '}
+                                dengan skor {window.minScore}–10.
                             </span>
-                            <span
-                                className="rounded-full bg-neutral-soft px-2 py-0.5 text-[0.6875rem] font-bold tracking-[0.06em] text-secondary-foreground uppercase"
-                                title="Daftar berita masih data contoh; integrasi sumber berita belum dibangun. Tombol Jadikan ide sudah tersimpan sungguhan."
-                            >
-                                Data contoh
-                            </span>
+                            {items.length > 0 ? (
+                                <span
+                                    className="rounded-full bg-neutral-soft px-2 py-0.5 text-[0.6875rem] font-bold text-secondary-foreground"
+                                    data-numeric
+                                >
+                                    {items.length} berita
+                                </span>
+                            ) : null}
                         </p>
                     </div>
                 </div>
@@ -81,9 +100,15 @@ export default function ContentNewsPage({ items }: Props) {
                             <p className="text-sm font-bold">
                                 Belum ada berita
                             </p>
-                            <p className="max-w-[38ch] text-xs leading-relaxed text-muted-foreground">
-                                Feed ini terisi dari seeder contoh untuk
-                                sekarang; integrasi sumber berita menyusul.
+                            <p className="max-w-[42ch] text-xs leading-relaxed text-muted-foreground">
+                                {window.since
+                                    ? `Tidak ada yang lolos saringan sejak ${dayLabel(window.since)}.`
+                                    : 'Belum ada berita yang tersimpan.'}{' '}
+                                Jalankan{' '}
+                                <code className="rounded bg-neutral-soft px-1 py-px font-mono text-[0.6875rem]">
+                                    php artisan news:sync
+                                </code>{' '}
+                                untuk menariknya.
                             </p>
                         </div>
                     </section>
@@ -120,10 +145,21 @@ export default function ContentNewsPage({ items }: Props) {
                                             >
                                                 <div className="flex items-start gap-3">
                                                     <div className="min-w-0 flex-1">
+                                                        {/* Who ran it, then what kind of story it
+                                                            is. The score is stored but not shown:
+                                                            everything here is a 9 or a 10, so
+                                                            printing it would say nothing. */}
                                                         <p className="flex flex-wrap items-center gap-x-2 gap-y-1">
                                                             <span className="rounded-full bg-neutral-soft px-2 py-0.5 text-[0.6875rem] font-bold text-secondary-foreground">
                                                                 {item.source}
                                                             </span>
+                                                            {item.category ? (
+                                                                <span className="text-[0.6875rem] font-bold tracking-[0.04em] text-primary-deep uppercase">
+                                                                    {
+                                                                        item.category
+                                                                    }
+                                                                </span>
+                                                            ) : null}
                                                         </p>
                                                         <p className="mt-1.5 text-[0.8438rem] leading-snug font-bold">
                                                             {item.url ? (
@@ -159,6 +195,7 @@ export default function ContentNewsPage({ items }: Props) {
                                                         {item.ideaId ? (
                                                             <Link
                                                                 href={ideasIndex()}
+                                                                aria-label="Sudah jadi ide — buka Ide Konten"
                                                                 className="inline-flex items-center gap-1.5 rounded-md bg-primary-soft px-2.5 py-1.5 text-xs font-bold text-primary-deep transition-colors hover:bg-accent"
                                                             >
                                                                 <Check
@@ -184,6 +221,7 @@ export default function ContentNewsPage({ items }: Props) {
                                                                     savingId ===
                                                                     item.id
                                                                 }
+                                                                aria-label={`Jadikan ide: ${item.title}`}
                                                             >
                                                                 <Lightbulb
                                                                     strokeWidth={

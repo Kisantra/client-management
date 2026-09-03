@@ -28,8 +28,10 @@ export type ContentIdea = {
 export type NewsRow = {
     id: number;
     title: string;
-    /** A category, not an outlet: Regulasi, Media, Komunitas, Internal. */
+    /** The outlet that ran it: DDTCNews, Ortax, Kompas. */
     source: string;
+    /** The pipeline's own bucket: Kebijakan, Regulasi, DJP/Operasional. */
+    category: string | null;
     url: string | null;
     summary: string | null;
     publishedAt: string;

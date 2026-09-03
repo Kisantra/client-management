@@ -23,8 +23,12 @@ class DatabaseSeeder extends Seeder
             ],
         );
 
-        $this->call(LeadSeeder::class);
-        $this->call(ContentSeeder::class);
-        $this->call(ContentIdeaSeeder::class);
+        /* Real dates, not samples: the tax deadlines and fixed national days
+           the content calendar has to plan around. */
+        $this->call(KeyDateSeeder::class);
+
+        // $this->call(LeadSeeder::class);
+        // $this->call(ContentSeeder::class);
+        // $this->call(ContentIdeaSeeder::class);
     }
 }

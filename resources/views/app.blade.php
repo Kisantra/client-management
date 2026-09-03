@@ -30,8 +30,9 @@
             }
         </style>
 
+        {{-- No SVG icon offered: the mark has no vector master yet, and a
+             browser given both prefers the SVG over the .ico. --}}
         <link rel="icon" href="/favicon.ico" sizes="any">
-        <link rel="icon" href="/favicon.svg" type="image/svg+xml">
         <link rel="apple-touch-icon" href="/apple-touch-icon.png">
 
         @fonts

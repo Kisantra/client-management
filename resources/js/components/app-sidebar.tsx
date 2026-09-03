@@ -31,7 +31,11 @@ import {
     tasks,
     team,
 } from '@/routes';
-import { ideas as contentIdeas, news as contentNews } from '@/routes/content';
+import {
+    brief as contentBrief,
+    ideas as contentIdeas,
+    news as contentNews,
+} from '@/routes/content';
 import { edit as editProfile } from '@/routes/profile';
 import type { NavGroup, SharedProps } from '@/types';
 
@@ -71,6 +75,11 @@ function buildNav(counts: SharedProps['counts']): NavGroup[] {
                             href: contentIdeas(),
                             section: '/content/ide',
                             badge: counts?.ideas ?? 0,
+                        },
+                        {
+                            title: 'Brief Harian',
+                            href: contentBrief(),
+                            section: '/content/brief',
                         },
                         {
                             title: 'Berita Terbaru',

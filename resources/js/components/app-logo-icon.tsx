@@ -1,18 +1,39 @@
-import type { SVGAttributes } from 'react';
+import type { ComponentProps } from 'react';
+
+import { cn } from '@/lib/utils';
 
 /**
- * Placeholder mark: three ascending columns with the newest one carried
- * forward, standing for the chain content -> lead -> active client.
- * Replace once the team supplies a real identity.
+ * The Kisantra mark, on the tile that belongs to it.
+ *
+ * The mark is white with one Teal Ink arm, so it only ever reads on Deep Teal.
+ * The tile is therefore part of the logo rather than decoration around it, and
+ * it lives here instead of at each call site. It uses `brand-tile` rather than
+ * `primary` on purpose: `primary` becomes the data-only Bright Teal in the dark
+ * theme, and a white mark on that clears only 2.4:1.
+ *
+ * This is the plain rendition. The mark's batik fill repeats every ~40px at
+ * source size, so anywhere under roughly 100px it stops being a pattern, goes
+ * flat grey, and takes the contrast down with it. Nothing in the app draws the
+ * logo that large. The batik survives only on the 180px touch icon.
  */
-export default function AppLogoIcon(props: SVGAttributes<SVGElement>) {
+export default function AppLogoIcon({
+    className,
+    ...props
+}: ComponentProps<'div'>) {
     return (
-        <svg {...props} viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
-            <path
-                fillRule="evenodd"
-                clipRule="evenodd"
-                d="M4 14.5a1.5 1.5 0 0 1 3 0v5a1.5 1.5 0 0 1-3 0v-5Zm6.5-4a1.5 1.5 0 0 1 3 0v9a1.5 1.5 0 0 1-3 0v-9ZM18.5 3A1.5 1.5 0 0 0 17 4.5v15a1.5 1.5 0 0 0 3 0v-15A1.5 1.5 0 0 0 18.5 3Z"
+        <div
+            className={cn(
+                'shrink-0 overflow-hidden rounded-lg bg-brand-tile',
+                className,
+            )}
+            {...props}
+        >
+            <img
+                src="/img/kisantra-mark.png"
+                alt=""
+                aria-hidden
+                className="size-full object-contain"
             />
-        </svg>
+        </div>
     );
 }

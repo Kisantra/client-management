@@ -65,6 +65,11 @@
     --color-channel-web: var(--channel-web);
     --color-channel-web-foreground: var(--channel-web-foreground);
 
+    /* The logo tile, Deep Teal in both themes rather than following --primary.
+       A mark that swaps weight when the theme flips stops being one mark, and
+       the dark theme's teal is the data-only bright one. */
+    --color-brand-tile: #0b7a6c;
+
     /* Stays dark in both themes: a deep panel inside a light rail. */
     --color-ink-panel: var(--ink-panel);
     --color-ink-panel-foreground: var(--ink-panel-foreground);
