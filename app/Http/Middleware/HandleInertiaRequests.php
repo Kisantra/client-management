@@ -5,6 +5,7 @@ namespace App\Http\Middleware;
 use App\Models\Content;
 use App\Models\ContentIdea;
 use App\Models\Lead;
+use App\Models\User;
 use App\Support\ContentPlan;
 use App\Support\Pipeline;
 use Closure;
@@ -102,7 +103,34 @@ class HandleInertiaRequests extends Middleware
                 'content' => Content::where('status', '!=', Content::PUBLISHED)->count(),
                 // Written down and still waiting for a date.
                 'ideas' => ContentIdea::whereNull('content_id')->count(),
+                // Everyone the work knows: accounts and calendar PJ names.
+                'team' => User::pluck('name')
+                    ->merge(Content::whereNotNull('owner')->where('owner', '!=', '')->distinct()->pluck('owner'))
+                    ->unique()
+                    ->count(),
             ] : null,
+
+            /*
+             | The bell: the newest of what happened while you were not
+             | looking, and how much of it is still unread. Reverb pushes the
+             | live update; this is what a fresh page load starts from.
+             */
+            'notifications' => fn () => $request->user() ? [
+                'items' => $request->user()
+                    ->notifications()
+                    ->latest()
+                    ->limit(15)
+                    ->get()
+                    ->map(fn ($notification) => [
+                        'id' => $notification->id,
+                        'data' => $notification->data,
+                        'readAt' => $notification->read_at?->toIso8601String(),
+                        'at' => $notification->created_at->toIso8601String(),
+                    ])
+                    ->all(),
+                'unread' => $request->user()->unreadNotifications()->count(),
+            ] : null,
+
         ];
     }
 }

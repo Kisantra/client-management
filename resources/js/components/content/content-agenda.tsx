@@ -7,7 +7,7 @@ import {
     STATUS_DOT,
     StatusPill,
 } from '@/components/content/status-mark';
-import type { ContentRow } from '@/data/content';
+import type { ContentRow, SpecialDay } from '@/data/content';
 import { dayLabel, timeLabel } from '@/data/content';
 import { CHANNEL_LABELS } from '@/data/dashboard';
 import { cn } from '@/lib/utils';
@@ -22,11 +22,14 @@ export function ContentAgenda({
     items,
     today,
     hrefFor,
+    specialDays,
 }: {
     items: ContentRow[];
     today: string;
     /** The calendar with this piece's panel open. */
     hrefFor: (id: number) => Href;
+    /** Key dates of the month, keyed by date. */
+    specialDays: Record<string, SpecialDay[]>;
 }) {
     const days = new Map<string, ContentRow[]>();
 
@@ -37,9 +40,22 @@ export function ContentAgenda({
         ]);
     }
 
+    /* A key date is worth a line even when nothing is scheduled on it — on a
+       phone this list is the whole calendar, and a plan that hides the SPT
+       deadline invites silence in the week the audience needs it. */
+    for (const date of Object.keys(specialDays)) {
+        if (!days.has(date)) {
+            days.set(date, []);
+        }
+    }
+
+    const ordered = Array.from(days.entries()).sort(([a], [b]) =>
+        a.localeCompare(b),
+    );
+
     return (
         <ol className="flex flex-col gap-5">
-            {Array.from(days.entries()).map(([date, rows]) => {
+            {ordered.map(([date, rows]) => {
                 const isToday = date === today;
 
                 return (
@@ -50,6 +66,24 @@ export function ContentAgenda({
                             >
                                 {dayLabel(date)}
                             </span>
+                            {(specialDays[date] ?? []).map((day) => (
+                                <span
+                                    key={day.name}
+                                    title={
+                                        day.note
+                                            ? `${day.name} — ${day.note}`
+                                            : day.name
+                                    }
+                                    className={cn(
+                                        'max-w-full min-w-0 truncate rounded-full px-1.5 py-px text-[0.6875rem] font-bold tracking-normal normal-case',
+                                        day.kind === 'libur'
+                                            ? 'bg-info-soft text-info'
+                                            : 'bg-primary-soft/70 text-primary-deep',
+                                    )}
+                                >
+                                    {day.name}
+                                </span>
+                            ))}
                             {isToday ? (
                                 <span className="rounded-full bg-primary px-1.5 py-px text-[0.6875rem] font-extrabold text-primary-foreground">
                                     Hari ini

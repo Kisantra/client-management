@@ -108,6 +108,11 @@ export default [
             'node_modules',
             'public',
             'bootstrap/ssr',
+            /* Skill bundles for coding agents, not part of the app. */
+            '.agents',
+            '.claude',
+            '.cursor',
+            '.github/skills',
             'tailwind.config.js',
             'vite.config.ts',
             'resources/js/actions/**',

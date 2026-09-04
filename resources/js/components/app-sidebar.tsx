@@ -1,4 +1,4 @@
-import { Link, usePage } from '@inertiajs/react';
+import { usePage } from '@inertiajs/react';
 import {
     Briefcase,
     CalendarDays,
@@ -9,7 +9,7 @@ import {
     Users,
     UsersRound,
 } from 'lucide-react';
-import AppLogo from '@/components/app-logo';
+import { AppSwitcher } from '@/components/app-switcher';
 import { NavMain } from '@/components/nav-main';
 import { NavUser } from '@/components/nav-user';
 import {
@@ -17,9 +17,6 @@ import {
     SidebarContent,
     SidebarFooter,
     SidebarHeader,
-    SidebarMenu,
-    SidebarMenuButton,
-    SidebarMenuItem,
 } from '@/components/ui/sidebar';
 import { navCounts } from '@/data/dashboard';
 import {
@@ -41,8 +38,8 @@ import type { NavGroup, SharedProps } from '@/types';
 
 /**
  * `counts` comes from the server on every page, so the Leads, Client and
- * Konten badges are the real totals; the rest are still sample figures from
- * modules that do not exist yet.
+ * Konten badges are the real totals; only Task still wears a sample figure
+ * from a module that does not exist yet.
  */
 function buildNav(counts: SharedProps['counts']): NavGroup[] {
     return [
@@ -108,7 +105,7 @@ function buildNav(counts: SharedProps['counts']): NavGroup[] {
                     title: 'Anggota',
                     href: team(),
                     icon: UsersRound,
-                    badge: navCounts.team,
+                    badge: counts?.team ?? 0,
                 },
                 {
                     title: 'Pengaturan',
@@ -128,25 +125,14 @@ export function AppSidebar() {
     return (
         <Sidebar collapsible="icon" variant="inset">
             {/*
-             | Three zones, each closed by a hairline: who this is, where you
+             | Three zones, each closed by a hairline: who this is (and the door to the
+             | company's other apps), where you
              | can go, and who you are. The rail is taller than the list of
              | places, and without the rules the leftover space read as
              | something missing rather than as room to spare.
              */}
             <SidebarHeader className="border-b border-sidebar-border pb-2">
-                <SidebarMenu>
-                    <SidebarMenuItem>
-                        <SidebarMenuButton
-                            size="lg"
-                            asChild
-                            className="hover:bg-neutral-soft hover:text-foreground active:bg-neutral-soft"
-                        >
-                            <Link href={dashboard()} prefetch>
-                                <AppLogo />
-                            </Link>
-                        </SidebarMenuButton>
-                    </SidebarMenuItem>
-                </SidebarMenu>
+                <AppSwitcher />
             </SidebarHeader>
 
             <SidebarContent className="gap-5 pt-2">

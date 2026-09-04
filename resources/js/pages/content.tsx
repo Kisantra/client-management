@@ -21,7 +21,12 @@ import { FilterSelect } from '@/components/filter-select';
 import { PeriodFilter } from '@/components/period-filter';
 import type { Period } from '@/components/period-filter';
 import { Button } from '@/components/ui/button';
-import type { ContentMonth, ContentRow, StatusCount } from '@/data/content';
+import type {
+    ContentMonth,
+    ContentRow,
+    SpecialDay,
+    StatusCount,
+} from '@/data/content';
 import { dayLabel } from '@/data/content';
 import type { ChannelKey } from '@/data/dashboard';
 import { useContentPlan } from '@/hooks/use-content-plan';
@@ -67,6 +72,8 @@ type Props = {
     totals: { count: number; late: number; published: number };
     owners: string[];
     items: ContentRow[];
+    /** Key dates of the shown month, keyed by date. */
+    specialDays: Record<string, SpecialDay[]>;
     /** The piece whose panel is open, when the URL names one. */
     selected: SelectedContent | null;
     /** The board's window. Null on the calendar, where the month is it. */
@@ -90,6 +97,7 @@ export default function ContentPage({
     totals,
     owners,
     items,
+    specialDays,
     selected,
     period,
 }: Props) {
@@ -599,6 +607,7 @@ export default function ContentPage({
                                 onAdd={openAdd}
                                 moreHref={moreHref}
                                 hrefFor={hrefFor}
+                                specialDays={specialDays}
                             />
                         </div>
 
@@ -616,6 +625,7 @@ export default function ContentPage({
                                     items={items}
                                     today={month.today}
                                     hrefFor={hrefFor}
+                                    specialDays={specialDays}
                                 />
                             )}
                         </section>

@@ -91,6 +91,26 @@ export type ContentMonth = {
     today: string;
 };
 
+/** One reviewer note on a piece, open until somebody signs it off. */
+export type ContentComment = {
+    id: number;
+    author: string;
+    body: string;
+    /** Full ISO timestamp: reviews move within hours, not days. */
+    at: string;
+    resolved: boolean;
+    resolvedBy: string | null;
+};
+
+/** A day the calendar owns before the team does. */
+export type SpecialDay = {
+    name: string;
+    /** 'libur' is a national day; 'pajak' is a filing or payment deadline. */
+    kind: 'libur' | 'pajak';
+    /** What it means for the team, and why it is worth a post. */
+    note: string | null;
+};
+
 export type StatusCount = {
     key: ContentStatus;
     label: string;

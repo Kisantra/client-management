@@ -1,6 +1,8 @@
-import { Bell, Mail, Search, X } from 'lucide-react';
+import type { Bell } from 'lucide-react';
+import { Mail, Search, X } from 'lucide-react';
 import { useState } from 'react';
 import { Breadcrumbs } from '@/components/breadcrumbs';
+import { NotificationBell } from '@/components/notification-bell';
 import { SidebarTrigger } from '@/components/ui/sidebar';
 import type { BreadcrumbItem as BreadcrumbItemType } from '@/types';
 
@@ -49,7 +51,7 @@ export function AppSidebarHeader({
                     </button>
 
                     <HeaderAction label="Pesan" icon={Mail} />
-                    <HeaderAction label="Notifikasi" icon={Bell} unread />
+                    <NotificationBell />
                 </div>
             </header>
 

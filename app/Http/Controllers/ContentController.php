@@ -6,6 +6,9 @@ use App\Http\Requests\ContentRequest;
 use App\Models\Content;
 use App\Models\ContentIdea;
 use App\Models\ContentStatusEvent;
+use App\Models\KeyDate;
+use App\Models\User;
+use App\Notifications\ContentStatusChanged;
 use App\Support\ContentPlan;
 use App\Support\Month;
 use App\Support\Period;
@@ -14,6 +17,7 @@ use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Http\Request;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Notification;
 use Inertia\Inertia;
 use Inertia\Response;
 
@@ -133,6 +137,26 @@ class ContentController extends Controller
                 ->pluck('owner')
                 ->all(),
             'items' => $items,
+            /*
+             | The days the month already owns — national days and the tax
+             | deadlines — so nobody plans a hard sell onto a holiday or
+             | misses the filing peak the audience is living through.
+             */
+            'specialDays' => KeyDate::query()
+                ->between($month, $month->copy()->endOfMonth())
+                ->orderBy('date')
+                ->orderBy('kind')
+                ->get()
+                ->groupBy(fn (KeyDate $day) => $day->date->toDateString())
+                ->map(fn ($group) => $group
+                    ->map(fn (KeyDate $day) => [
+                        'name' => $day->title,
+                        'kind' => $day->kind,
+                        'note' => $day->note,
+                    ])
+                    ->values()
+                    ->all())
+                ->all(),
             /*
              | The piece opened in the side panel, when the URL names one. A
              | closure, so the panel can ask for just this on a partial reload
@@ -256,6 +280,8 @@ class ContentController extends Controller
                 ->get()
                 ->map->toRow()
                 ->all(),
+            // The review, said out loud: every note, open ones on top.
+            'comments' => $content->comments->map->toRow()->all(),
         ];
     }
 
@@ -271,6 +297,8 @@ class ContentController extends Controller
 
     public function update(ContentRequest $request, Content $content)
     {
+        $wasStatus = $content->status;
+
         DB::transaction(function () use ($request, $content) {
             $columns = $request->columns();
             $moved = $columns['status'] !== $content->status;
@@ -290,6 +318,20 @@ class ContentController extends Controller
                 ]);
             }
         });
+
+        // The edit form is the other door into the QA flow; it rings the same bell.
+        if ($content->status !== $wasStatus) {
+            Notification::send(
+                User::where('id', '!=', $request->user()->id)->get(),
+                new ContentStatusChanged(
+                    $request->user()->name,
+                    $content->id,
+                    $content->title,
+                    ContentPlan::label($wasStatus),
+                    ContentPlan::label($content->status),
+                ),
+            );
+        }
 
         $this->toast('Perubahan tersimpan', $content->title.' sudah diperbarui.');
 

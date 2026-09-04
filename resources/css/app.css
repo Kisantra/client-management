@@ -70,6 +70,13 @@
        the dark theme's teal is the data-only bright one. */
     --color-brand-tile: #0b7a6c;
 
+    /* Sister tiles for the app switcher: the same Kisantra mark, each ERP
+       site on its own base — cerulean blue for projects, navy for
+       attendance — so the row of apps reads as one family, told apart by
+       colour rather than by a different mark. */
+    --color-brand-project: #1790b5;
+    --color-brand-attendance: #1e3a8a;
+
     /* Stays dark in both themes: a deep panel inside a light rail. */
     --color-ink-panel: var(--ink-panel);
     --color-ink-panel-foreground: var(--ink-panel-foreground);

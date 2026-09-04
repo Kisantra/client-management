@@ -19,6 +19,7 @@ import {
 import { useState } from 'react';
 import { channelNames } from '@/components/content/channel-marks';
 import { CHANNEL_TONE } from '@/components/content/channel-tone';
+import { CommentThread } from '@/components/content/comment-thread';
 import { ContentForm } from '@/components/content/content-form';
 import { DeleteDialog } from '@/components/content/delete-dialog';
 import { PublishDialog } from '@/components/content/publish-dialog';
@@ -46,6 +47,7 @@ import {
     SheetTitle,
 } from '@/components/ui/sheet';
 import type {
+    ContentComment,
     ContentDetail,
     ContentEvent,
     ContentStatus,
@@ -67,9 +69,11 @@ export type SelectedContent = {
     events: ContentEvent[];
     /** The newest leads it brought in; the count on `content` has them all. */
     leads: Lead[];
+    /** Reviewer notes, newest first; the open ones are the work. */
+    comments: ContentComment[];
 };
 
-type Tab = 'riwayat' | 'lead';
+type Tab = 'riwayat' | 'komentar' | 'lead';
 
 /**
  * A piece's record, as a card floated in from the right over the calendar
@@ -187,11 +191,17 @@ function Body({
     /** Turns this card into the form for the piece it is showing. */
     onEdit: () => void;
 }) {
-    const { content, events, leads } = selected;
+    const { content, events, leads, comments } = selected;
     const { statuses } = useContentPlan();
     const initials = useInitials();
 
-    const [tab, setTab] = useState<Tab>('riwayat');
+    /* Reviewer feedback outranks history: a panel opened while notes are
+       still open lands on them. */
+    const openComments = comments.filter((comment) => !comment.resolved).length;
+
+    const [tab, setTab] = useState<Tab>(
+        openComments > 0 ? 'komentar' : 'riwayat',
+    );
     const [publishOpen, setPublishOpen] = useState(false);
     const [deleteOpen, setDeleteOpen] = useState(false);
     const [moving, setMoving] = useState(false);
@@ -557,6 +567,15 @@ function Body({
                         Riwayat
                     </TabButton>
                     <TabButton
+                        active={tab === 'komentar'}
+                        onClick={() => setTab('komentar')}
+                        count={
+                            comments.length > 0 ? comments.length : undefined
+                        }
+                    >
+                        Komentar
+                    </TabButton>
+                    <TabButton
                         active={tab === 'lead'}
                         onClick={() => setTab('lead')}
                         count={leadCount}
@@ -568,6 +587,11 @@ function Body({
                 <div role="tabpanel" className="px-5 py-5 sm:px-7">
                     {tab === 'riwayat' ? (
                         <Timeline events={events} current={content} />
+                    ) : tab === 'komentar' ? (
+                        <CommentThread
+                            contentId={content.id}
+                            comments={comments}
+                        />
                     ) : (
                         <LeadList
                             leads={leads}

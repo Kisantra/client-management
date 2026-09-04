@@ -4,7 +4,7 @@ import { Plus } from 'lucide-react';
 import { ChannelMarks, channelNames } from '@/components/content/channel-marks';
 import { CHANNEL_TONE } from '@/components/content/channel-tone';
 import { STATUS_DOT } from '@/components/content/status-mark';
-import type { ContentMonth, ContentRow } from '@/data/content';
+import type { ContentMonth, ContentRow, SpecialDay } from '@/data/content';
 import { toIso } from '@/data/content';
 import { asDate } from '@/data/leads';
 import { cn } from '@/lib/utils';
@@ -26,6 +26,8 @@ type Props = {
     moreHref: (date: string) => Href;
     /** The calendar with this piece's panel open. */
     hrefFor: (id: number) => Href;
+    /** Key dates of the month, keyed by date. */
+    specialDays: Record<string, SpecialDay[]>;
 };
 
 /**
@@ -40,6 +42,7 @@ export function ContentCalendar({
     onAdd,
     moreHref,
     hrefFor,
+    specialDays,
 }: Props) {
     const first = asDate(month.start);
     const daysInMonth = asDate(month.end).getDate();
@@ -99,6 +102,7 @@ export function ContentCalendar({
                             today={month.today}
                             weekend={index % 7 >= 5}
                             items={byDay.get(date) ?? []}
+                            specialDays={specialDays[date] ?? []}
                             onAdd={onAdd}
                             moreHref={moreHref}
                             hrefFor={hrefFor}
@@ -115,6 +119,7 @@ function DayCell({
     today,
     weekend,
     items,
+    specialDays,
     onAdd,
     moreHref,
     hrefFor,
@@ -123,12 +128,14 @@ function DayCell({
     today: string;
     weekend: boolean;
     items: ContentRow[];
+    specialDays: SpecialDay[];
     onAdd: (date: string) => void;
     moreHref: (date: string) => Href;
     hrefFor: (id: number) => Href;
 }) {
     const isToday = date === today;
     const past = date < today;
+    const dayOff = specialDays.some((day) => day.kind === 'libur');
     const shown = items.slice(0, SHOWN);
     const rest = items.length - shown.length;
 
@@ -146,9 +153,11 @@ function DayCell({
                         'grid size-6 place-items-center rounded-full text-xs font-bold',
                         isToday
                             ? 'bg-primary text-primary-foreground'
-                            : past
-                              ? 'text-muted-foreground'
-                              : 'text-secondary-foreground',
+                            : dayOff
+                              ? 'text-info'
+                              : past
+                                ? 'text-muted-foreground'
+                                : 'text-secondary-foreground',
                     )}
                     data-numeric
                 >
@@ -168,6 +177,24 @@ function DayCell({
                     <span className="sr-only">Tambah konten pada {date}</span>
                 </button>
             </div>
+
+            {/* The day's own name, before the team's work on it. Slate for a
+                national day, soft teal for a filing deadline; never red — a
+                key date is a fact of the calendar, not an alarm. */}
+            {specialDays.map((day) => (
+                <p
+                    key={day.name}
+                    title={day.note ? `${day.name} — ${day.note}` : day.name}
+                    className={cn(
+                        'truncate rounded-sm px-1.5 py-1 text-[0.6875rem] leading-none font-semibold',
+                        day.kind === 'libur'
+                            ? 'bg-info-soft text-info'
+                            : 'bg-primary-soft/70 text-primary-deep',
+                    )}
+                >
+                    {day.name}
+                </p>
+            ))}
 
             {shown.map((item) => (
                 <CalendarChip

@@ -47,6 +47,20 @@ export type SharedContent = {
     stuckAfterDays: Record<string, number>;
 };
 
+/** One entry under the bell, as the server shapes it. */
+export type AppNotification = {
+    id: string;
+    data: {
+        kind: string;
+        title: string;
+        body: string;
+        url: string;
+    };
+    readAt: string | null;
+    /** Full ISO timestamp. */
+    at: string;
+};
+
 export type SharedProps = {
     name: string;
     auth: Auth;
@@ -58,6 +72,8 @@ export type SharedProps = {
         clients: number;
         content: number;
         ideas: number;
+        team: number;
     } | null;
+    notifications: { items: AppNotification[]; unread: number } | null;
     [key: string]: unknown;
 };

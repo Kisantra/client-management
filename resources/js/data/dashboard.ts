@@ -144,5 +144,4 @@ export const team: TeamMember[] = [
 /** Leads, clients and content come from the server; these two have no module yet. */
 export const navCounts = {
     tasks: 12,
-    team: 11,
 };

@@ -3,10 +3,13 @@
 namespace App\Http\Controllers;
 
 use App\Models\Content;
+use App\Models\User;
+use App\Notifications\ContentStatusChanged;
 use App\Support\ContentPlan;
 use Illuminate\Http\Request;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Notification;
 use Illuminate\Validation\Rule;
 
 /**
@@ -54,6 +57,18 @@ class ContentStatusController extends Controller
                 'at' => $today,
             ]);
         });
+
+        // Everyone but the mover hears it, live, through Reverb.
+        Notification::send(
+            User::where('id', '!=', $request->user()->id)->get(),
+            new ContentStatusChanged(
+                $request->user()->name,
+                $content->id,
+                $content->title,
+                $from,
+                ContentPlan::label($content->status),
+            ),
+        );
 
         $this->toast(
             $content->title.($publishing ? ' sudah tayang' : ': '.$from.' → '.ContentPlan::label($content->status)),

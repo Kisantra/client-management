@@ -62,6 +62,12 @@ class Content extends Model
         return $this->hasMany(ContentStatusEvent::class)->orderBy('at')->orderBy('id');
     }
 
+    /** Reviewer notes, newest first: the open ones are the work. @return HasMany<ContentComment, $this> */
+    public function comments(): HasMany
+    {
+        return $this->hasMany(ContentComment::class)->latest()->latest('id');
+    }
+
     public function isPublished(): bool
     {
         return $this->status === self::PUBLISHED;

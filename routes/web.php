@@ -2,6 +2,7 @@
 
 use App\Http\Controllers\BriefController;
 use App\Http\Controllers\ClientController;
+use App\Http\Controllers\ContentCommentController;
 use App\Http\Controllers\ContentController;
 use App\Http\Controllers\ContentFieldController;
 use App\Http\Controllers\ContentIdeaController;
@@ -13,8 +14,10 @@ use App\Http\Controllers\LeadFollowUpController;
 use App\Http\Controllers\LeadNoteController;
 use App\Http\Controllers\LeadStageController;
 use App\Http\Controllers\NewsController;
+use App\Http\Controllers\NotificationController;
 use App\Http\Controllers\PerformanceController;
 use App\Http\Controllers\SocialVideoController;
+use App\Http\Controllers\TeamController;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Route;
 
@@ -85,8 +88,22 @@ Route::middleware(['auth', 'verified'])->group(function () {
         Route::delete('/', [ContentController::class, 'destroy'])->name('content.destroy');
 
         Route::post('status', [ContentStatusController::class, 'store'])->name('content.status.store');
+
+        Route::post('comments', [ContentCommentController::class, 'store'])
+            ->name('content.comments.store');
+        Route::patch('comments/{comment}', [ContentCommentController::class, 'update'])
+            ->whereNumber('comment')
+            ->name('content.comments.update');
+        Route::delete('comments/{comment}', [ContentCommentController::class, 'destroy'])
+            ->whereNumber('comment')
+            ->name('content.comments.destroy');
         Route::post('field', [ContentFieldController::class, 'store'])->name('content.field.store');
     });
+    Route::post('notifications/baca-semua', [NotificationController::class, 'readAll'])
+        ->name('notifications.read-all');
+    Route::post('notifications/{id}/baca', [NotificationController::class, 'read'])
+        ->name('notifications.read');
+
     Route::get('performance', PerformanceController::class)->name('performance');
     Route::get('performance/konten', [PerformanceController::class, 'content'])
         ->name('performance.content');
@@ -98,7 +115,11 @@ Route::middleware(['auth', 'verified'])->group(function () {
     Route::post('performance/refresh', [PerformanceController::class, 'refresh'])
         ->name('performance.refresh');
     Route::inertia('tasks', 'tasks')->name('tasks');
-    Route::inertia('team', 'team')->name('team');
+    Route::get('team', [TeamController::class, 'index'])->name('team');
+    Route::post('team', [TeamController::class, 'store'])->name('team.store');
+    Route::patch('team/{user}', [TeamController::class, 'update'])
+        ->whereNumber('user')
+        ->name('team.update');
 });
 
 require __DIR__.'/settings.php';

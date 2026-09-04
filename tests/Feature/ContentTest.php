@@ -1,6 +1,7 @@
 <?php
 
 use App\Models\Content;
+use App\Models\KeyDate;
 use App\Models\Lead;
 use App\Models\User;
 use Illuminate\Support\Carbon;
@@ -577,4 +578,26 @@ it('hands the edit form the hour in the shape the field takes', function () {
     ]))->assertInertia(fn ($page) => $page
         ->where('selected.content.scheduledTime', '19:00')
     );
+});
+
+it('annotates the month with its key dates', function () {
+    KeyDate::create(['date' => '2026-08-17', 'title' => 'Hari Kemerdekaan RI', 'kind' => 'libur', 'note' => 'Konten seremonial.']);
+    KeyDate::create(['date' => '2026-08-20', 'title' => 'Batas lapor SPT Masa PPh masa Juli', 'kind' => 'pajak']);
+    // Next month: not on this page.
+    KeyDate::create(['date' => '2026-09-10', 'title' => 'Batas setor PPh masa Agustus', 'kind' => 'pajak']);
+
+    $this->get(route('content'))
+        ->assertInertia(fn ($page) => $page
+            ->has('specialDays', 2)
+            ->where('specialDays.2026-08-17.0.name', 'Hari Kemerdekaan RI')
+            ->where('specialDays.2026-08-17.0.kind', 'libur')
+            ->where('specialDays.2026-08-17.0.note', 'Konten seremonial.')
+            ->where('specialDays.2026-08-20.0.kind', 'pajak')
+        );
+
+    $this->get(route('content', ['bulan' => '2026-09']))
+        ->assertInertia(fn ($page) => $page
+            ->has('specialDays', 1)
+            ->where('specialDays.2026-09-10.0.name', 'Batas setor PPh masa Agustus')
+        );
 });
