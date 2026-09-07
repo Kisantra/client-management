@@ -6,6 +6,7 @@ import type { Client } from '@/data/clients';
 import { CHANNEL_LABELS } from '@/data/dashboard';
 import { entryDate, relativeDays, shortRupiah } from '@/data/leads';
 import { useInitials } from '@/hooks/use-initials';
+import { rowLink } from '@/lib/row-link';
 import { show as leadShow } from '@/routes/leads';
 
 export type ClientSort = 'sejak' | 'kontak' | 'nilai' | 'nama';
@@ -70,7 +71,8 @@ export function ClientsTable({ rows, sort, onSort }: Props) {
                         {rows.map((client) => (
                             <tr
                                 key={client.id}
-                                className="border-b border-border text-[0.8438rem] transition-colors last:border-b-0 hover:bg-neutral-soft"
+                                {...rowLink(leadShow(client.id))}
+                                className="cursor-pointer border-b border-border text-[0.8438rem] transition-colors last:border-b-0 hover:bg-neutral-soft"
                             >
                                 <th
                                     scope="row"
@@ -86,6 +88,14 @@ export function ClientsTable({ rows, sort, onSort }: Props) {
                                     <span className="block truncate text-xs text-muted-foreground">
                                         {client.pic} · {client.service}
                                     </span>
+                                    {/* Only the exception is marked: an active
+                                        client is the normal state and says
+                                        nothing, a signed deal says so. */}
+                                    {client.stage === 'deal' ? (
+                                        <span className="mt-1 inline-flex rounded-full bg-neutral-soft px-2 py-0.5 text-[0.6875rem] font-bold tracking-[0.06em] text-muted-foreground uppercase">
+                                            {client.stageLabel}
+                                        </span>
+                                    ) : null}
                                 </th>
                                 <td className="max-w-[14rem] py-3 pr-4">
                                     <span className="flex items-center gap-1.5 truncate text-xs font-semibold text-secondary-foreground">
@@ -154,8 +164,15 @@ export function ClientsTable({ rows, sort, onSort }: Props) {
                             className="-mx-2 flex items-center gap-3 rounded-md border-b border-border px-2 py-3.5 transition-colors hover:bg-neutral-soft"
                         >
                             <span className="min-w-0 flex-1">
-                                <span className="block truncate text-[0.8438rem] font-bold">
-                                    {client.company}
+                                <span className="flex items-baseline gap-2">
+                                    <span className="min-w-0 truncate text-[0.8438rem] font-bold">
+                                        {client.company}
+                                    </span>
+                                    {client.stage === 'deal' ? (
+                                        <span className="shrink-0 rounded-full bg-neutral-soft px-2 py-0.5 text-[0.6875rem] font-bold tracking-[0.06em] text-muted-foreground uppercase">
+                                            {client.stageLabel}
+                                        </span>
+                                    ) : null}
                                 </span>
                                 <span className="mt-0.5 flex flex-wrap items-center gap-x-2 gap-y-1 text-xs text-muted-foreground">
                                     <span className="truncate">

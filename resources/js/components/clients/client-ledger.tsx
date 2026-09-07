@@ -11,11 +11,14 @@ import { cn } from '@/lib/utils';
 export function ClientLedger({
     summary,
     threshold,
+    stageLabels,
     onNeedsContact,
 }: {
     summary: ClientSummary;
     /** Days without contact after which a client counts as due a call. */
-    threshold: number;
+    /** Days without contact each stage tolerates, keyed by stage. */
+    threshold: Record<string, number>;
+    stageLabels: Record<string, string>;
     /** Turns the list into the call sheet: longest unspoken-to first. */
     onNeedsContact: () => void;
 }) {
@@ -29,7 +32,7 @@ export function ClientLedger({
         >
             <Figure
                 label="Client aktif"
-                value={count}
+                value={summary.activeCount}
                 caption={
                     <>
                         <span
@@ -40,8 +43,7 @@ export function ClientLedger({
                             {summary.newThisMonth}
                         </span>{' '}
                         bulan ini ·{' '}
-                        <span data-numeric>{summary.newLastMonth}</span> pada{' '}
-                        {summary.lastMonth}
+                        <span data-numeric>{summary.dealCount}</span> sudah deal
                     </>
                 }
             />
@@ -56,7 +58,8 @@ export function ClientLedger({
                             <span data-numeric>
                                 {shortRupiah(summary.average)}
                             </span>{' '}
-                            per client
+                            dari <span data-numeric>{count}</span> yang sudah
+                            deal
                         </>
                     ) : (
                         'belum ada nilai yang tercatat'
@@ -73,10 +76,12 @@ export function ClientLedger({
                 }
                 caption={
                     summary.fastestDays === null ? (
-                        'dari tanggal masuk sampai jadi client'
+                        'belum ada yang sampai jadi client'
                     ) : (
                         <>
-                            median · tercepat{' '}
+                            median dari{' '}
+                            <span data-numeric>{summary.convertedCount}</span>{' '}
+                            client · tercepat{' '}
                             <span data-numeric>{summary.fastestDays} hari</span>
                         </>
                     )
@@ -89,8 +94,13 @@ export function ClientLedger({
                 alarm={due > 0}
                 caption={
                     <>
-                        belum dihubungi lebih dari{' '}
-                        <span data-numeric>{threshold}</span> hari
+                        lewat batas tahapnya —{' '}
+                        {Object.entries(threshold)
+                            .map(
+                                ([stage, days]) =>
+                                    `${stageLabels[stage] ?? stage} ${days} hari`,
+                            )
+                            .join(' · ')}
                     </>
                 }
                 onClick={due > 0 ? onNeedsContact : undefined}

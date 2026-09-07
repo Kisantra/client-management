@@ -1,4 +1,4 @@
-import { router } from '@inertiajs/react';
+import { router, usePage } from '@inertiajs/react';
 import { ArrowLeft, CalendarDays, Check } from 'lucide-react';
 import { useState } from 'react';
 import { toast } from 'sonner';
@@ -31,7 +31,7 @@ import {
 import { Textarea } from '@/components/ui/textarea';
 import type { ContentStatus, EditableContent } from '@/data/content';
 import { toIso } from '@/data/content';
-import { CHANNEL_LABELS, team } from '@/data/dashboard';
+import { CHANNEL_LABELS } from '@/data/dashboard';
 import type { ChannelKey } from '@/data/dashboard';
 import { asDate, TODAY } from '@/data/leads';
 import { useContentPlan } from '@/hooks/use-content-plan';
@@ -40,6 +40,7 @@ import {
     store as contentStore,
     update as contentUpdate,
 } from '@/routes/content';
+import type { SharedProps } from '@/types/shared';
 
 /** The hours this team actually publishes at; the field takes any other. */
 const SLOTS = ['07:00', '09:00', '12:00', '17:00', '19:00'];
@@ -134,8 +135,12 @@ export function ContentForm({
        whichever channel was ticked first. */
     const lead = channels[0] ?? 'instagram';
 
-    // A team member who has since left still has to edit cleanly.
-    const owners = team.map((member) => member.name);
+    /* The real team, shared on every page. A member who has since left still
+       has to edit cleanly, so a value already on the piece is kept in the
+       list even when it is no longer offered. */
+    const owners = (usePage<SharedProps>().props.team ?? []).map(
+        (member) => member.name,
+    );
 
     if (owner && !owners.includes(owner)) {
         owners.push(owner);

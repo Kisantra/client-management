@@ -144,7 +144,21 @@ function DayCell({
             role="listitem"
             className={cn(
                 'group/day flex min-h-[7.5rem] min-w-0 flex-col gap-1 border-r border-b border-border p-1.5 [&:nth-child(7n)]:border-r-0',
-                weekend && 'bg-neutral-soft/40',
+                /*
+                 | A day the team is off — the weekend, or a national holiday
+                 | the key-date table knows about — carries the faintest wash
+                 | of the alarm hue. Under 5%: about half the strength of
+                 | Alarm Wash, so a late piece still lands on it as a bordered
+                 | red card with red text and stays unmistakable. The ground is
+                 | the only thing tinted; nothing an alarm uses is touched.
+                 |
+                 | The dark theme needs nearly twice the alpha for the same
+                 | read. Measured on screen: 4.5% lifts a near-black cell by
+                 | ten points of red, which the eye loses, where the same ten
+                 | points taken off a near-white one are plain.
+                 */
+                (weekend || dayOff) &&
+                    'bg-destructive/[0.045] dark:bg-destructive/[0.08]',
             )}
         >
             <div className="flex items-center justify-between">

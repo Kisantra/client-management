@@ -1,4 +1,4 @@
-import { Head, Link, router } from '@inertiajs/react';
+import { Head, Link, router, usePage } from '@inertiajs/react';
 import { ArrowLeft, CalendarDays, Check, Info } from 'lucide-react';
 import { useState } from 'react';
 import { toast } from 'sonner';
@@ -25,13 +25,14 @@ import {
     SelectValue,
 } from '@/components/ui/select';
 import { Textarea } from '@/components/ui/textarea';
-import { CHANNEL_LABELS, team } from '@/data/dashboard';
+import { CHANNEL_LABELS } from '@/data/dashboard';
 import type { ChannelKey } from '@/data/dashboard';
 import { asDate, shortRupiah, TODAY } from '@/data/leads';
 import { usePipeline, useStageLabels } from '@/hooks/use-pipeline';
 import { cn } from '@/lib/utils';
 import { clients, leads } from '@/routes';
 import { store as leadsStore, update as leadsUpdate } from '@/routes/leads';
+import type { SharedProps } from '@/types/shared';
 
 const ENTITIES = ['PT', 'CV', 'UD', 'Koperasi', 'Perorangan'];
 
@@ -123,6 +124,10 @@ export function LeadForm({
 }) {
     const { stages } = usePipeline();
     const stageLabels = useStageLabels();
+
+    /* The real team, shared on every page: accounts plus the names the work
+       already carries. A hardcoded list would go stale the day somebody joins. */
+    const team = usePage<SharedProps>().props.team ?? [];
 
     const [entity, setEntity] = useState(lead?.entity ?? 'PT');
     const [company, setCompany] = useState(lead?.company ?? '');
@@ -914,9 +919,14 @@ export function LeadForm({
                                                 value={member.name}
                                             >
                                                 {member.name}
+                                                {/* What they are holding, not
+                                                    a share of a capacity the
+                                                    app cannot yet state. */}
                                                 <span className="ml-auto text-xs text-muted-foreground">
-                                                    {member.assigned}/
-                                                    {member.capacity}
+                                                    {member.hasAccount
+                                                        ? ''
+                                                        : 'tanpa akun · '}
+                                                    {member.active} konten
                                                 </span>
                                             </SelectItem>
                                         ))}

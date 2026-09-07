@@ -8,6 +8,7 @@ use App\Models\Lead;
 use App\Models\User;
 use App\Support\ContentPlan;
 use App\Support\Pipeline;
+use App\Support\Team;
 use Closure;
 use Illuminate\Http\Request;
 use Inertia\Inertia;
@@ -66,6 +67,20 @@ class HandleInertiaRequests extends Middleware
      */
     public function share(Request $request): array
     {
+        /*
+         | Read once for whichever prop asks first, and held by this request
+         | rather than by the class: a static memo outlives the request inside
+         | a queue worker and starts handing out yesterday's roster.
+         */
+        $members = null;
+        $team = function () use ($request, &$members) {
+            if ($members === null) {
+                $members = $request->user() ? Team::members() : [];
+            }
+
+            return $members;
+        };
+
         return [
             ...parent::share($request),
             'name' => config('app.name'),
@@ -98,17 +113,25 @@ class HandleInertiaRequests extends Middleware
             // Sidebar badges: what each module actually holds right now.
             'counts' => fn () => $request->user() ? [
                 'leads' => Lead::active()->count(),
-                'clients' => Lead::active()->where('stage', 'client')->count(),
+                /* Deal counts too, because the Client page holds both — a
+                   rail badge that disagrees with the page behind it is a
+                   broken promise, not a second opinion. */
+                'clients' => Lead::active()->whereIn('stage', ['deal', 'client'])->count(),
                 // Still in production: everything not yet live.
                 'content' => Content::where('status', '!=', Content::PUBLISHED)->count(),
                 // Written down and still waiting for a date.
                 'ideas' => ContentIdea::whereNull('content_id')->count(),
-                // Everyone the work knows: accounts and calendar PJ names.
-                'team' => User::pluck('name')
-                    ->merge(Content::whereNotNull('owner')->where('owner', '!=', '')->distinct()->pluck('owner'))
-                    ->unique()
-                    ->count(),
+                // Everyone the work knows: accounts and the names it carries.
+                'team' => count($team()),
             ] : null,
+
+            /*
+             | Who may be put down as PJ. Shared rather than passed per page
+             | because the picker appears on the lead form and, through a
+             | dialog and a sheet, on the content calendar too — threading the
+             | same list through three layers is how two of them drift apart.
+             */
+            'team' => fn () => $request->user() ? $team() : null,
 
             /*
              | The bell: the newest of what happened while you were not

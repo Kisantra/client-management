@@ -68,6 +68,75 @@ it('lists only active clients, with the figures that measure them', function () 
         );
 });
 
+it('counts a signed deal as a client, but never as an active one', function () {
+    client();
+    client([
+        'company' => 'Baru Deal',
+        'stage' => 'deal',
+        'value' => 20_000_000,
+        'stage_changed_at' => Carbon::today()->subDays(4),
+    ]);
+    /* Everything short of a signature stays out. */
+    client(['company' => 'Masih Proposal', 'stage' => 'proposal']);
+    /* A deal that fell through is not money the firm has. */
+    client([
+        'company' => 'Deal Berhenti',
+        'stage' => 'deal',
+        'status' => Lead::CLOSED,
+        'closed_at' => Carbon::today(),
+    ]);
+
+    $this->get(route('clients'))
+        ->assertInertia(fn ($page) => $page
+            ->where('total', 2)
+            ->where('summary.count', 2)
+            /* The split is the point: the page holds two, only one is running. */
+            ->where('summary.activeCount', 1)
+            ->where('summary.dealCount', 1)
+            ->where('summary.value', 70_000_000)
+            /* A deal has not converted, so it may not enter the conversion
+               figure — counting its shorter journey would report a speed the
+               firm never reached. */
+            ->where('summary.convertedCount', 1)
+            ->where('summary.medianDays', 190)
+            ->where('summary.fastestDays', 190)
+            ->has('rows.data', 2)
+            ->where('rows.data.0.company', 'PT Baru Deal')
+            ->where('rows.data.0.stage', 'deal')
+            ->where('rows.data.0.stageLabel', 'Deal')
+            ->where('rows.data.0.daysToConvert', null)
+            ->where('rows.data.1.company', 'PT Graha Artha')
+            ->where('rows.data.1.stage', 'client')
+            ->where('rows.data.1.daysToConvert', 190)
+        );
+});
+
+it('measures each row against the contact tolerance of its own stage', function () {
+    /* Twenty days of silence: nothing at all for a running client, three
+       weeks overdue for a deal nobody has started. One shared threshold would
+       have let the deal sit unanswered and still look healthy. */
+    client(['company' => 'Client Diam', 'last_contact_at' => Carbon::today()->subDays(20)]);
+    client([
+        'company' => 'Deal Diam',
+        'stage' => 'deal',
+        'last_contact_at' => Carbon::today()->subDays(20),
+        'stage_changed_at' => Carbon::today()->subDays(4),
+    ]);
+
+    $this->get(route('clients'))
+        ->assertInertia(fn ($page) => $page
+            ->where('summary.needsContact', 1)
+            ->where('contactThreshold.deal', 5)
+            ->where('contactThreshold.client', 30)
+            ->where('stageLabels.deal', 'Deal')
+            ->where('stageLabels.client', 'Client aktif')
+            ->where('rows.data.0.company', 'PT Deal Diam')
+            ->where('rows.data.0.needsContact', true)
+            ->where('rows.data.1.company', 'PT Client Diam')
+            ->where('rows.data.1.needsContact', false)
+        );
+});
+
 it('flags a client left unspoken-to past the stage tolerance, and puts them first', function () {
     client();
     client(['company' => 'Mekar Raya', 'last_contact_at' => Carbon::today()->subDays(31)]);

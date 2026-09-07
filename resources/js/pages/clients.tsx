@@ -42,7 +42,9 @@ type Props = {
     /** Active clients before any filter: decides which empty state shows. */
     total: number;
     /** Days without contact after which a client counts as due a call. */
-    contactThreshold: number;
+    /** Days without contact each stage tolerates, keyed by stage. */
+    contactThreshold: Record<string, number>;
+    stageLabels: Record<string, string>;
     summary: ClientSummary;
     channels: Share[];
     owners: Share[];
@@ -73,6 +75,7 @@ export default function Clients({
     filters,
     total,
     contactThreshold,
+    stageLabels,
     summary,
     channels,
     owners,
@@ -154,9 +157,18 @@ export default function Clients({
                                     className="font-bold text-foreground"
                                     data-numeric
                                 >
-                                    {summary.count}
+                                    {summary.activeCount}
                                 </span>{' '}
                                 client {hasFilters ? 'cocok' : 'aktif'}
+                                {summary.dealCount > 0 ? (
+                                    <>
+                                        {' · '}
+                                        <span data-numeric>
+                                            {summary.dealCount}
+                                        </span>{' '}
+                                        sudah deal
+                                    </>
+                                ) : null}
                             </span>
                             {summary.needsContact > 0 ? (
                                 <span className="font-semibold text-destructive">
@@ -187,6 +199,7 @@ export default function Clients({
                 <ClientLedger
                     summary={summary}
                     threshold={contactThreshold}
+                    stageLabels={stageLabels}
                     onNeedsContact={() => go({ urut: 'kontak' })}
                 />
 
@@ -291,8 +304,14 @@ export default function Clients({
                         />
                         Angka merah
                     </span>{' '}
-                    = client yang belum dihubungi lebih dari{' '}
-                    <span data-numeric>{contactThreshold}</span> hari.
+                    = belum dihubungi lebih lama dari batas tahapnya —{' '}
+                    {Object.entries(contactThreshold)
+                        .map(
+                            ([stage, days]) =>
+                                `${stageLabels[stage] ?? stage} ${days} hari`,
+                        )
+                        .join(' · ')}
+                    .
                 </p>
 
                 {total === 0 ? (

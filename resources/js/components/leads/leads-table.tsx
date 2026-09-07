@@ -6,6 +6,7 @@ import { SortHead } from '@/components/sort-head';
 import { CHANNEL_LABELS } from '@/data/dashboard';
 import { entryDate, relativeDays, shortRupiah } from '@/data/leads';
 import type { Lead } from '@/data/leads';
+import { rowLink } from '@/lib/row-link';
 import { show as leadShow } from '@/routes/leads';
 
 export type LeadSort = 'nama' | 'lama' | 'nilai' | 'kontak' | 'masuk';
@@ -74,7 +75,8 @@ export function LeadsTable({ rows, sort, onSort }: Props) {
                         {rows.map((lead) => (
                             <tr
                                 key={lead.id}
-                                className="border-b border-border text-[0.8438rem] transition-colors last:border-b-0 hover:bg-neutral-soft"
+                                {...rowLink(leadShow(lead.id))}
+                                className="cursor-pointer border-b border-border text-[0.8438rem] transition-colors last:border-b-0 hover:bg-neutral-soft"
                             >
                                 <th
                                     scope="row"

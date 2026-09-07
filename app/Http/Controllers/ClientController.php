@@ -12,15 +12,25 @@ use Inertia\Inertia;
 use Inertia\Response;
 
 /**
- * The firm's clients: the leads that reached the last stage and are still on.
+ * The firm's clients: everything that has been signed and is still on.
  *
- * There is no second record. A client is a lead standing in the `client`
- * stage, so every figure here is read from the leads table and the stage move
- * that made it a client, and the chain from content to client stays one line.
+ * Two stages qualify — a lead that has dealt and one already running as an
+ * active client — because the money is committed at the deal and the team
+ * treats it as theirs from that moment. The two are never merged into one
+ * word, though: a deal row says so on its face, the conversion figure counts
+ * only the ones that actually converted, and each row is measured against the
+ * contact tolerance of its own stage, not a shared one.
+ *
+ * There is no second record. A client is a lead standing in one of those two
+ * stages, so every figure here is read from the leads table and the stage move
+ * that put it there, and the chain from content to client stays one line.
  */
 class ClientController extends Controller
 {
     private const PER_PAGE = 20;
+
+    /** The stages this page speaks for, in pipeline order. */
+    private const STAGES = ['deal', 'client'];
 
     /** The pj filter value that means nobody has been assigned yet. */
     public const UNASSIGNED = 'tanpa';
@@ -35,11 +45,15 @@ class ClientController extends Controller
         $filters = $this->filters($request);
 
         /*
-         | A client nobody has spoken to for longer than the stage's own
-         | tolerance is due a call. The number is read from config/pipeline.php,
-         | the same one that marks a client mandek on the Leads page.
+         | Somebody nobody has spoken to for longer than their own stage
+         | tolerates is due a call. A deal is given five days and a running
+         | client thirty, both read from config/pipeline.php — the same numbers
+         | that mark a lead mandek on the Leads page. One shared figure would
+         | have let a signed deal go three weeks unanswered and still look fine.
          */
-        $threshold = Pipeline::threshold('client');
+        $threshold = collect(self::STAGES)
+            ->mapWithKeys(fn (string $stage) => [$stage => Pipeline::threshold($stage)])
+            ->all();
 
         $matching = $this->matching($filters);
 
@@ -47,6 +61,9 @@ class ClientController extends Controller
             'filters' => $filters,
             'total' => $this->base()->count(),
             'contactThreshold' => $threshold,
+            'stageLabels' => collect(self::STAGES)
+                ->mapWithKeys(fn (string $stage) => [$stage => Pipeline::label($stage)])
+                ->all(),
             'summary' => $this->summary(clone $matching, $threshold),
             /*
              | The rails count under every filter except their own, so picking
@@ -91,7 +108,7 @@ class ClientController extends Controller
     /** @return Builder<Lead> */
     private function base(): Builder
     {
-        return Lead::query()->active()->where('stage', 'client');
+        return Lead::query()->active()->whereIn('stage', self::STAGES);
     }
 
     /**
@@ -139,24 +156,34 @@ class ClientController extends Controller
      * @param  Builder<Lead>  $matching
      * @return array<string, int|string|null>
      */
-    private function summary(Builder $matching, int $threshold): array
+    private function summary(Builder $matching, array $threshold): array
     {
         $today = Carbon::today();
         $thisMonth = $today->copy()->startOfMonth();
         $lastMonth = $thisMonth->copy()->subMonth();
 
-        $rows = (clone $matching)->get(['entered_at', 'stage_changed_at', 'value']);
+        $rows = (clone $matching)->get(['stage', 'entered_at', 'stage_changed_at', 'value']);
         $count = $rows->count();
         $value = (int) $rows->sum(fn (Lead $lead) => $lead->value);
 
-        // Days from the first enquiry to becoming a client, shortest first.
+        /*
+         | Days from the first enquiry to becoming a client, shortest first —
+         | and only for the ones that got there. A deal has not converted yet,
+         | so counting its shorter journey would drag the median down and
+         | report a speed the firm never reached.
+         */
         $conversion = $rows
+            ->where('stage', 'client')
             ->map(fn (Lead $lead) => $this->daysToConvert($lead))
             ->sort()
             ->values();
 
         return [
             'count' => $count,
+            /* Named apart on purpose: a deal is signed, not yet running, and
+               a tile labelled "client aktif" may never count one. */
+            'activeCount' => (clone $matching)->where('stage', 'client')->count(),
+            'dealCount' => (clone $matching)->where('stage', 'deal')->count(),
             'value' => $value,
             'average' => $count === 0 ? 0 : (int) round($value / $count),
             'newThisMonth' => (clone $matching)
@@ -167,8 +194,9 @@ class ClientController extends Controller
                 ->whereDate('stage_changed_at', '<', $thisMonth->toDateString())
                 ->count(),
             'lastMonth' => self::MONTHS[$lastMonth->month - 1],
-            'medianDays' => $count === 0 ? null : $this->median($conversion),
-            'fastestDays' => $count === 0 ? null : (int) $conversion->first(),
+            'medianDays' => $conversion->isEmpty() ? null : $this->median($conversion),
+            'fastestDays' => $conversion->isEmpty() ? null : (int) $conversion->first(),
+            'convertedCount' => $conversion->count(),
             'needsContact' => $this->needingContact(clone $matching, $threshold)->count(),
         ];
     }
@@ -177,13 +205,21 @@ class ClientController extends Controller
      * Clients whose last contact is older than the stage tolerates.
      *
      * @param  Builder<Lead>  $query
+     * @param  array<string, int>  $threshold
      * @return Builder<Lead>
      */
-    private function needingContact(Builder $query, int $threshold): Builder
+    private function needingContact(Builder $query, array $threshold): Builder
     {
-        $cutoff = Carbon::today()->subDays($threshold)->toDateString();
-
-        return $query->whereRaw('date(coalesce(last_contact_at, entered_at)) < ?', [$cutoff]);
+        return $query->where(function (Builder $group) use ($threshold) {
+            foreach ($threshold as $stage => $days) {
+                $group->orWhere(fn (Builder $one) => $one
+                    ->where('stage', $stage)
+                    ->whereRaw(
+                        'date(coalesce(last_contact_at, entered_at)) < ?',
+                        [Carbon::today()->subDays($days)->toDateString()],
+                    ));
+            }
+        });
     }
 
     /**
@@ -287,7 +323,7 @@ class ClientController extends Controller
      * @param  array<string, string>  $filters
      * @return array<string, mixed>
      */
-    private function page(Builder $query, array $filters, int $threshold): array
+    private function page(Builder $query, array $filters, array $threshold): array
     {
         $page = $this->sorted($query, $filters['urut'])
             ->paginate(self::PER_PAGE)
@@ -325,15 +361,21 @@ class ClientController extends Controller
      *
      * @return array<string, mixed>
      */
-    private function row(Lead $lead, int $threshold): array
+    private function row(Lead $lead, array $threshold): array
     {
         return [
             ...$lead->toRow(),
             'owner' => $lead->owner ?: null,
             'city' => $lead->city,
+            'stage' => $lead->stage,
+            'stageLabel' => Pipeline::label($lead->stage),
             'since' => $lead->stage_changed_at->toDateString(),
-            'daysToConvert' => $this->daysToConvert($lead),
-            'needsContact' => $lead->daysSinceContact() > $threshold,
+            /* Only a client has converted; for a deal this is how long it took
+               to sign, which is a different measurement and stays null. */
+            'daysToConvert' => $lead->stage === 'client'
+                ? $this->daysToConvert($lead)
+                : null,
+            'needsContact' => $lead->daysSinceContact() > ($threshold[$lead->stage] ?? 30),
         ];
     }
 

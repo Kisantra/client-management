@@ -61,6 +61,16 @@ export type AppNotification = {
     at: string;
 };
 
+/** Someone a piece of work can be put down to. */
+export type TeamMember = {
+    name: string;
+    /** False for a name the work carries that has no sign-in yet. */
+    hasAccount: boolean;
+    /** Unfinished content they are holding. There is no capacity to measure
+     *  it against yet, so the figure stands alone rather than inventing one. */
+    active: number;
+};
+
 export type SharedProps = {
     name: string;
     auth: Auth;
@@ -74,6 +84,8 @@ export type SharedProps = {
         ideas: number;
         team: number;
     } | null;
+    /** Who may be put down as PJ, accounts first. */
+    team: TeamMember[] | null;
     notifications: { items: AppNotification[]; unread: number } | null;
     [key: string]: unknown;
 };
