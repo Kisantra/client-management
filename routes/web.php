@@ -1,5 +1,6 @@
 <?php
 
+use App\Http\Controllers\ActivityController;
 use App\Http\Controllers\BriefController;
 use App\Http\Controllers\ClientController;
 use App\Http\Controllers\ContentCommentController;
@@ -115,6 +116,10 @@ Route::middleware(['auth', 'verified'])->group(function () {
     Route::post('performance/refresh', [PerformanceController::class, 'refresh'])
         ->name('performance.refresh');
     Route::inertia('tasks', 'tasks')->name('tasks');
+    /* The log of what the team did, read as a page of its own rather than a
+       panel bolted onto each record. */
+    Route::get('aktivitas', ActivityController::class)->name('activity');
+
     Route::get('team', [TeamController::class, 'index'])->name('team');
     Route::post('team', [TeamController::class, 'store'])->name('team.store');
     Route::patch('team/{user}', [TeamController::class, 'update'])

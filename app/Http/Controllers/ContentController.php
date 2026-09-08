@@ -12,6 +12,7 @@ use App\Notifications\ContentStatusChanged;
 use App\Support\ContentPlan;
 use App\Support\Month;
 use App\Support\Period;
+use App\Support\ReleasedPosts;
 use Carbon\CarbonInterface;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Http\Request;
@@ -163,6 +164,14 @@ class ContentController extends Controller
              | and the calendar underneath never re-renders.
              */
             'selected' => fn () => $this->selected($request),
+
+            /*
+             | The Tautan picker's options. Optional, so the calendar does not
+             | carry two hundred scraped posts on every load for a field most
+             | pieces never fill; the picker asks for them the first time it
+             | is opened.
+             */
+            'released' => Inertia::optional(fn () => ReleasedPosts::all()),
         ]);
     }
 
@@ -282,6 +291,10 @@ class ContentController extends Controller
                 ->all(),
             // The review, said out loud: every note, open ones on top.
             'comments' => $content->comments->map->toRow()->all(),
+
+            /* What the piece actually did, once its Tautan points at a post
+               Performa follows. Null otherwise, and the panel says nothing. */
+            'live' => ReleasedPosts::find($content->url),
         ];
     }
 

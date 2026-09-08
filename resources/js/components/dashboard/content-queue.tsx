@@ -1,9 +1,11 @@
+import { Link } from '@inertiajs/react';
 import { CalendarPlus } from 'lucide-react';
 import { ChannelMarks } from '@/components/content/channel-marks';
 import { STATUS_DOT } from '@/components/content/status-mark';
 import type { ContentRow, ContentStatus } from '@/data/content';
 import { shortDayLabel, timeLabel } from '@/data/content';
 import { cn } from '@/lib/utils';
+import { show as contentShow } from '@/routes/content';
 
 /** One piece of the week's work, with where it sits in the order of urgency. */
 export type QueueItem = ContentRow & { rank: number };
@@ -120,15 +122,33 @@ function Rule({ children }: { children: React.ReactNode }) {
     );
 }
 
+/**
+ * One row, and the way to the thing it names.
+ *
+ * The row goes to the piece's own URL, which lands on the calendar at the
+ * piece's month with its panel already open — so a piece owed since July opens
+ * on July, not on whatever month the calendar was last left at. That rule lives
+ * on the server, in `ContentController::show`, and is not restated here: the
+ * dashboard only has to know which piece, never where it lives.
+ *
+ * A real link, not a click handler on a div, so the row keeps middle-click,
+ * open-in-new-tab, the app's own focus ring, and an announced destination.
+ */
 function QueueRow({ item }: { item: QueueItem }) {
     const done = item.rank === 4;
     const held = item.stuck && !item.late;
 
     return (
-        <div
+        <Link
+            href={contentShow(item.id)}
             className={cn(
                 '-mx-2 flex items-start gap-3.5 rounded-md px-2.5 py-2.5 transition-colors',
-                item.late ? 'bg-destructive-soft' : 'hover:bg-neutral-soft',
+                /* A breached row is already carrying the alarm wash, so its
+                   hover has to deepen that rather than replace it — the one
+                   state it must never lose is the one saying it is late. */
+                item.late
+                    ? 'bg-destructive-soft hover:bg-destructive/15'
+                    : 'hover:bg-neutral-soft',
             )}
         >
             {/* The day anchors the row: a week reads as a schedule, and the
@@ -206,7 +226,7 @@ function QueueRow({ item }: { item: QueueItem }) {
                     Tertahan {item.daysInStatus} hari
                 </span>
             ) : null}
-        </div>
+        </Link>
     );
 }
 

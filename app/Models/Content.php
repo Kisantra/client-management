@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use App\Models\Concerns\RecordsActivity;
 use App\Support\ContentPlan;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Model;
@@ -17,6 +18,8 @@ use Illuminate\Support\Carbon;
  */
 class Content extends Model
 {
+    use RecordsActivity;
+
     public const PUBLISHED = 'published';
 
     protected $guarded = [];
@@ -159,5 +162,26 @@ class Content extends Model
             'leads' => isset($this->leads_count) ? (int) $this->leads_count : null,
             'clients' => isset($this->clients_count) ? (int) $this->clients_count : null,
         ];
+    }
+
+    public function activityType(): string
+    {
+        return 'konten';
+    }
+
+    public function activityLabel(): string
+    {
+        return (string) $this->title;
+    }
+
+    public function activityUrl(): ?string
+    {
+        return route('content.show', $this, false);
+    }
+
+    /** Stamped by the status move that caused it, not set by hand. */
+    public function activityIgnores(): array
+    {
+        return ['status_changed_at'];
     }
 }

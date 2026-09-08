@@ -54,6 +54,8 @@ import type {
 } from '@/data/content';
 import { timeLabel } from '@/data/content';
 import { CHANNEL_LABELS } from '@/data/dashboard';
+import type { ChannelKey } from '@/data/dashboard';
+import { nf } from '@/data/instagram';
 import type { Lead } from '@/data/leads';
 import { entryDate, longDate, shortRupiah } from '@/data/leads';
 import { useContentPlan } from '@/hooks/use-content-plan';
@@ -64,6 +66,24 @@ import { store as moveStatus } from '@/routes/content/status';
 import { show as leadShow } from '@/routes/leads';
 
 /** Everything the panel shows for one piece, as the server sends it. */
+/**
+ * The post behind the piece's Tautan, as Performa last saw it.
+ *
+ * Null whenever the link points somewhere Performa does not follow, which is
+ * most of the time for a piece that has not gone out yet.
+ */
+export type LivePost = {
+    channel: ChannelKey;
+    format: string;
+    thumb: string | null;
+    caption: string;
+    date: string;
+    counts: { label: string; value: number }[];
+    /** When the figures were last scraped, already written out. */
+    syncedAt: string | null;
+    href: string;
+};
+
 export type SelectedContent = {
     content: ContentDetail;
     events: ContentEvent[];
@@ -71,6 +91,7 @@ export type SelectedContent = {
     leads: Lead[];
     /** Reviewer notes, newest first; the open ones are the work. */
     comments: ContentComment[];
+    live: LivePost | null;
 };
 
 type Tab = 'riwayat' | 'komentar' | 'lead';
@@ -191,7 +212,7 @@ function Body({
     /** Turns this card into the form for the piece it is showing. */
     onEdit: () => void;
 }) {
-    const { content, events, leads, comments } = selected;
+    const { content, events, leads, comments, live } = selected;
     const { statuses } = useContentPlan();
     const initials = useInitials();
 
@@ -517,6 +538,13 @@ function Body({
                         </Prop>
                     </dl>
 
+                    {/*
+                        What it did once it was out. Directly under Tautan,
+                        because it is the answer to that link and nothing else:
+                        the piece stops being a plan here and becomes a result.
+                    */}
+                    {live ? <LiveResult live={live} /> : null}
+
                     {/* The copy as it will be posted, kept apart from the
                         brief that asked for it: one is the instruction, the
                         other is the thing itself, and reading them as one
@@ -622,6 +650,96 @@ function Body({
 }
 
 /** One line of the record: a small glyph and label, then the fact. */
+/**
+ * The piece as it landed: its own thumbnail, and the counts it earned.
+ *
+ * A piece with a Tautan used to end at the address — you could open the post,
+ * or go to Performa and find it again by eye, but the panel that was meant to
+ * be the piece's whole record stopped short of the only part that says whether
+ * it worked. This is that part, and it is deliberately brief: three counts and
+ * a way through to the rest.
+ *
+ * The counts carry the date they were scraped. A figure with no date behind it
+ * gets read as live, and these are true as of the last sync, not as of now.
+ */
+function LiveResult({ live }: { live: LivePost }) {
+    return (
+        <section className="mt-6 overflow-hidden rounded-lg border border-border">
+            <div className="flex items-start gap-3.5 p-3.5">
+                {live.thumb ? (
+                    <img
+                        src={live.thumb}
+                        alt=""
+                        loading="lazy"
+                        className="size-16 shrink-0 rounded-md border border-border object-cover"
+                    />
+                ) : (
+                    <span
+                        className="grid size-16 shrink-0 place-items-center rounded-md bg-neutral-soft text-muted-foreground"
+                        aria-hidden
+                    >
+                        <ChannelIcon
+                            channel={live.channel}
+                            className="size-5"
+                        />
+                    </span>
+                )}
+
+                <div className="min-w-0 flex-1">
+                    <p className="flex items-center gap-1.5 text-[0.6875rem] font-bold tracking-[0.08em] text-muted-foreground uppercase">
+                        <ChannelIcon
+                            channel={live.channel}
+                            className="size-3"
+                        />
+                        {live.format}
+                        <span aria-hidden>·</span>
+                        <span data-numeric>{live.date}</span>
+                    </p>
+
+                    <p className="mt-1 line-clamp-2 text-[0.8438rem] leading-snug">
+                        {live.caption || 'Tanpa keterangan'}
+                    </p>
+                </div>
+            </div>
+
+            <dl className="flex flex-wrap items-center gap-x-6 gap-y-2 border-t border-border bg-neutral-soft/60 px-3.5 py-3">
+                {live.counts.map((count) => (
+                    <div key={count.label}>
+                        <dt className="text-[0.6875rem] text-muted-foreground">
+                            {count.label}
+                        </dt>
+                        <dd
+                            className="text-base leading-tight font-extrabold tracking-[-0.02em]"
+                            data-numeric
+                        >
+                            {nf.format(count.value)}
+                        </dd>
+                    </div>
+                ))}
+
+                <Link
+                    href={live.href}
+                    className="ml-auto inline-flex items-center gap-1 self-end text-xs font-bold text-primary-deep underline decoration-transparent underline-offset-4 transition-colors hover:decoration-current"
+                >
+                    Lihat di Performa
+                    <ChevronRight
+                        className="size-3.5"
+                        strokeWidth={2.5}
+                        aria-hidden
+                    />
+                </Link>
+            </dl>
+
+            {live.syncedAt ? (
+                <p className="border-t border-border px-3.5 py-2 text-[0.6875rem] text-muted-foreground">
+                    Angka per sinkronisasi terakhir Performa,{' '}
+                    <span data-numeric>{live.syncedAt}</span>.
+                </p>
+            ) : null}
+        </section>
+    );
+}
+
 function Prop({
     icon: Icon,
     label,

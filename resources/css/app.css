@@ -374,8 +374,64 @@
         animation: pick-up 160ms cubic-bezier(0.16, 1, 0.3, 1) forwards;
     }
 
+    /*
+     | The sign-in splash. The copy block rises once as the page settles, and
+     | nothing about that arrival loops — the loop belongs to the panel above it,
+     | which cycles through the workspace itself.
+     */
+    @keyframes float-in {
+        from {
+            opacity: 0;
+            transform: translateY(16px) scale(0.97);
+        }
+
+        to {
+            opacity: 1;
+            transform: none;
+        }
+    }
+
+    .animate-float-in {
+        animation: float-in 620ms cubic-bezier(0.16, 1, 0.3, 1) both;
+    }
+
+    /* The caption naming the frame on screen. Lighter than float-in and with no
+       scale, because it lands on a single line of text that would blur. */
+    @keyframes caption-in {
+        from {
+            opacity: 0;
+            transform: translateY(6px);
+        }
+    }
+
+    .animate-caption-in {
+        animation: caption-in 420ms cubic-bezier(0.16, 1, 0.3, 1) both;
+    }
+
+    /*
+     | How long a frame is held, drawn as it is spent. The bar is also the clock:
+     | its `animationend` is what advances the panel, so the thing on screen and
+     | the thing measuring it can never drift apart, and pausing the bar on hover
+     | pauses the cycle with it.
+     |
+     | Scale from zero, never width, so the fill composites. The unanimated state
+     | is deliberately the full bar: under reduced motion the animation is
+     | dropped, the panel stops advancing, and the current frame's bar reads as
+     | complete rather than as stuck at empty.
+     */
+    @keyframes dwell {
+        from {
+            transform: scaleX(0);
+        }
+    }
+
+    .animate-dwell {
+        animation: dwell 6500ms linear forwards;
+    }
+
     /* The data panel's own moment: figures draw themselves in the direction they
        are read. Clip-path rather than scale, so radii and stroke weights hold. */
+
     @keyframes draw-up {
         from {
             clip-path: inset(100% 0 0 0);
@@ -459,7 +515,10 @@
         .animate-settle,
         .animate-draw-up,
         .animate-draw-across,
-        .animate-pick-up {
+        .animate-pick-up,
+        .animate-float-in,
+        .animate-caption-in,
+        .animate-dwell {
             animation: none;
         }
     }

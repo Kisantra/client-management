@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use App\Models\Concerns\RecordsActivity;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Support\Carbon;
@@ -15,6 +16,8 @@ use Illuminate\Support\Carbon;
  */
 class KeyDate extends Model
 {
+    use RecordsActivity;
+
     public const LIBUR = 'libur';
 
     public const PAJAK = 'pajak';
@@ -39,5 +42,20 @@ class KeyDate extends Model
     public function kindLabel(): string
     {
         return $this->kind === self::PAJAK ? 'Pajak' : 'Libur';
+    }
+
+    public function activityType(): string
+    {
+        return 'tanggal-penting';
+    }
+
+    public function activityLabel(): string
+    {
+        return (string) $this->title;
+    }
+
+    public function activityUrl(): ?string
+    {
+        return route('content', absolute: false);
     }
 }

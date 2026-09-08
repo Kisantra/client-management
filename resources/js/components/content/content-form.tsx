@@ -4,6 +4,7 @@ import { useState } from 'react';
 import { toast } from 'sonner';
 import { ChannelMarks } from '@/components/content/channel-marks';
 import { CHANNEL_TONE } from '@/components/content/channel-tone';
+import { LinkPicker } from '@/components/content/link-picker';
 import { STATUS_DOT } from '@/components/content/status-mark';
 import { ChannelIcon } from '@/components/leads/channel-icon';
 import { Field } from '@/components/leads/form-field';
@@ -604,17 +605,13 @@ export function ContentForm({
                     optional
                     error={errors.url}
                     className="@lg:col-span-2"
-                    hint="Alamat postingan atau halaman setelah tayang."
+                    hint="Alamat postingan setelah tayang. Pilih dari yang sudah tersimpan di Performa, atau tempel sendiri."
                 >
-                    <Input
-                        id="url"
-                        type="url"
-                        inputMode="url"
+                    <LinkPicker
                         value={url}
-                        onChange={(event) => setUrl(event.target.value)}
-                        placeholder="https://www.instagram.com/p/…"
-                        aria-invalid={Boolean(errors.url)}
-                        aria-describedby={errors.url ? 'url-error' : 'url-hint'}
+                        onChange={setUrl}
+                        invalid={Boolean(errors.url)}
+                        describedBy={errors.url ? 'url-error' : 'url-hint'}
                     />
                 </Field>
             </div>

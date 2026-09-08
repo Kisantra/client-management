@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use App\Models\Concerns\RecordsActivity;
 use App\Support\Pipeline;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Model;
@@ -11,6 +12,8 @@ use Illuminate\Support\Carbon;
 
 class Lead extends Model
 {
+    use RecordsActivity;
+
     /** Still being worked. */
     public const ACTIVE = 'aktif';
 
@@ -170,5 +173,26 @@ class Lead extends Model
             'closedReason' => Pipeline::closeReasonLabel($this->closed_reason),
             'closedAt' => $this->closed_at?->toDateString(),
         ];
+    }
+
+    public function activityType(): string
+    {
+        return 'lead';
+    }
+
+    public function activityLabel(): string
+    {
+        return trim($this->entity.' '.$this->company);
+    }
+
+    public function activityUrl(): ?string
+    {
+        return route('leads.show', $this, false);
+    }
+
+    /** Dates the pipeline keeps in step by itself; nobody typed these. */
+    public function activityIgnores(): array
+    {
+        return ['stage_changed_at', 'stalled_at'];
     }
 }

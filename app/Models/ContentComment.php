@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use App\Models\Concerns\RecordsActivity;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
@@ -13,6 +14,8 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
  */
 class ContentComment extends Model
 {
+    use RecordsActivity;
+
     protected $guarded = [];
 
     protected function casts(): array
@@ -45,5 +48,22 @@ class ContentComment extends Model
             'resolved' => $this->isResolved(),
             'resolvedBy' => $this->resolved_by,
         ];
+    }
+
+    public function activityType(): string
+    {
+        return 'komentar';
+    }
+
+    public function activityLabel(): string
+    {
+        return (string) $this->body;
+    }
+
+    public function activityUrl(): ?string
+    {
+        return $this->content_id
+            ? route('content.show', $this->content_id, false)
+            : null;
     }
 }

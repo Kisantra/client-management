@@ -4,6 +4,7 @@ namespace App\Http\Controllers;
 
 use App\Models\ContentIdea;
 use App\Support\ContentPlan;
+use App\Support\ReleasedPosts;
 use Illuminate\Http\Request;
 use Illuminate\Validation\Rule;
 use Inertia\Inertia;
@@ -30,6 +31,10 @@ class ContentIdeaController extends Controller
                 ->get()
                 ->map(fn (ContentIdea $idea) => $idea->toRow())
                 ->all(),
+
+            /* Scheduling opens the calendar's own form here too, so the same
+               Tautan picker has to be able to ask for its options. */
+            'released' => Inertia::optional(fn () => ReleasedPosts::all()),
         ]);
     }
 

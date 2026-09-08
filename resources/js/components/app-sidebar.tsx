@@ -4,6 +4,7 @@ import {
     CalendarDays,
     ChartNoAxesColumn,
     LayoutGrid,
+    History,
     ListChecks,
     Settings,
     Users,
@@ -20,6 +21,7 @@ import {
 } from '@/components/ui/sidebar';
 import { navCounts } from '@/data/dashboard';
 import {
+    activity,
     clients,
     content,
     dashboard,
@@ -100,6 +102,11 @@ function buildNav(counts: SharedProps['counts']): NavGroup[] {
                     href: tasks(),
                     icon: ListChecks,
                     badge: navCounts.tasks,
+                },
+                {
+                    title: 'Aktivitas',
+                    href: activity(),
+                    icon: History,
                 },
                 {
                     title: 'Anggota',

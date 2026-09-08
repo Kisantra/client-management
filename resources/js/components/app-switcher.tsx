@@ -51,6 +51,17 @@ const APPS: {
  * The logo block doubles as the way between apps: click it and pick where to
  * go. Its old job — back to the dashboard — survives as the first entry, so
  * the reflex of clicking the logo to go home still works.
+ *
+ * It is given a resting surface, which the user menu at the other end of the
+ * sidebar is not, and the difference is deliberate. An avatar in a corner is a
+ * menu everybody has already learned; a company wordmark is a wordmark, and
+ * nothing about it suggests the other systems are one click behind it. The
+ * feature is the one here that cannot be guessed, so it is the one that gets
+ * drawn as a control: a hairline and a recessed fill at rest, a tooltip naming
+ * what it does, and the chevron in ink rather than grey.
+ *
+ * Neutral, never teal. Teal on this rail means the page you are on, and a
+ * permanently teal header would claim to be the current page forever.
  */
 export function AppSwitcher() {
     const { state } = useSidebar();
@@ -63,11 +74,15 @@ export function AppSwitcher() {
                     <DropdownMenuTrigger asChild>
                         <SidebarMenuButton
                             size="lg"
-                            className="hover:bg-neutral-soft hover:text-foreground data-[state=open]:bg-neutral-soft"
+                            /* Collapsed, the rail is the logo tile and nothing
+                               else — a frame drawn tight around it would only
+                               fight its own corners. */
+                            className="border border-sidebar-border bg-background transition-colors group-data-[collapsible=icon]:border-transparent group-data-[collapsible=icon]:bg-transparent hover:bg-neutral-soft hover:text-foreground data-[state=open]:bg-neutral-soft"
                             aria-label="Pindah aplikasi"
+                            title="Pindah aplikasi"
                         >
                             <AppLogo />
-                            <ChevronsUpDown className="ml-auto size-4 text-muted-foreground" />
+                            <ChevronsUpDown className="ml-auto size-4 text-secondary-foreground" />
                         </SidebarMenuButton>
                     </DropdownMenuTrigger>
 

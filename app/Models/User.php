@@ -3,6 +3,7 @@
 namespace App\Models;
 
 // use Illuminate\Contracts\Auth\MustVerifyEmail;
+use App\Models\Concerns\RecordsActivity;
 use Database\Factories\UserFactory;
 use Illuminate\Database\Eloquent\Attributes\Fillable;
 use Illuminate\Database\Eloquent\Attributes\Hidden;
@@ -35,6 +36,8 @@ class User extends Authenticatable implements PasskeyUser
     /** @use HasFactory<UserFactory> */
     use HasFactory, Notifiable, PasskeyAuthenticatable, TwoFactorAuthenticatable;
 
+    use RecordsActivity;
+
     /**
      * Get the attributes that should be cast.
      *
@@ -47,5 +50,26 @@ class User extends Authenticatable implements PasskeyUser
             'password' => 'hashed',
             'two_factor_confirmed_at' => 'datetime',
         ];
+    }
+
+    public function activityType(): string
+    {
+        return 'anggota';
+    }
+
+    public function activityLabel(): string
+    {
+        return (string) $this->name;
+    }
+
+    public function activityUrl(): ?string
+    {
+        return route('team', absolute: false);
+    }
+
+    /** Sign-in bookkeeping, not something a person did to the record. */
+    public function activityIgnores(): array
+    {
+        return ['email_verified_at', 'last_seen_at'];
     }
 }

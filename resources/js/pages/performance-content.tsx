@@ -315,11 +315,7 @@ export default function PerformanceContent({
                         ) : (
                             <section className="flex min-w-0 flex-col overflow-hidden rounded-xl border border-border bg-card shadow-lift">
                                 <div className="min-w-0 px-3.5 sm:px-4">
-                                    <ContentList
-                                        rows={rows}
-                                        sort={filters.urut}
-                                        onOpen={open}
-                                    />
+                                    <ContentList rows={rows} onOpen={open} />
                                 </div>
 
                                 <div className="flex flex-wrap items-center justify-between gap-3 border-t border-border p-3.5 text-xs sm:p-4">
