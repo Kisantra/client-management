@@ -347,6 +347,15 @@ function Body({
                     </SheetDescription>
 
                     {/* The record, one fact per line: where it stands, when, who. */}
+                    {/*
+                        What it did once it was out, before the plan that made
+                        it. For a piece that has gone out this is the answer to
+                        the whole record — reading fifteen scheduling fields
+                        before reaching it had the panel telling the story
+                        backwards.
+                    */}
+                    {live ? <LiveResult live={live} /> : null}
+
                     <dl className="mt-6 grid grid-cols-[7.5rem_minmax(0,1fr)] gap-x-4 gap-y-4 text-[0.8438rem] sm:grid-cols-[9.5rem_minmax(0,1fr)]">
                         <Prop icon={Loader} label="Status">
                             <span className="flex flex-wrap items-center gap-2">
@@ -538,13 +547,6 @@ function Body({
                         </Prop>
                     </dl>
 
-                    {/*
-                        What it did once it was out. Directly under Tautan,
-                        because it is the answer to that link and nothing else:
-                        the piece stops being a plan here and becomes a result.
-                    */}
-                    {live ? <LiveResult live={live} /> : null}
-
                     {/* The copy as it will be posted, kept apart from the
                         brief that asked for it: one is the instruction, the
                         other is the thing itself, and reading them as one
@@ -662,31 +664,66 @@ function Body({
  * The counts carry the date they were scraped. A figure with no date behind it
  * gets read as live, and these are true as of the last sync, not as of now.
  */
+/**
+ * What the piece did, as a wide banner across the top of its own record.
+ *
+ * The post's own picture is the banner — cropped to the strip rather than set
+ * beside it as a tile, so the piece is recognised the way it is recognised in
+ * a feed: by its image, at width. The crop is the honest cost of that shape,
+ * and the whole banner opens the full post in Performa.
+ *
+ * The counts wait for attention. At rest the banner says which post this is;
+ * point at it and it says how the post did. Hiding a number behind a hover is
+ * a real cost, so the reveal is not hover alone: it opens on keyboard focus
+ * too, and on anything without a pointer the counts are simply always there.
+ */
 function LiveResult({ live }: { live: LivePost }) {
     return (
-        <section className="mt-6 overflow-hidden rounded-lg border border-border">
-            <div className="flex items-start gap-3.5 p-3.5">
-                {live.thumb ? (
-                    <img
-                        src={live.thumb}
-                        alt=""
-                        loading="lazy"
-                        className="size-16 shrink-0 rounded-md border border-border object-cover"
-                    />
-                ) : (
-                    <span
-                        className="grid size-16 shrink-0 place-items-center rounded-md bg-neutral-soft text-muted-foreground"
-                        aria-hidden
-                    >
-                        <ChannelIcon
-                            channel={live.channel}
-                            className="size-5"
-                        />
-                    </span>
-                )}
+        <Link
+            href={live.href}
+            title="Lihat di Performa"
+            className="group/banner relative isolate -mx-5 mt-5 flex h-32 items-end overflow-hidden border-y border-border sm:-mx-7"
+        >
+            {live.thumb ? (
+                <img
+                    src={live.thumb}
+                    alt=""
+                    loading="lazy"
+                    className="absolute inset-0 -z-20 size-full object-cover transition-transform duration-500 ease-out group-hover/banner:scale-[1.03]"
+                />
+            ) : (
+                <span
+                    aria-hidden
+                    className="absolute inset-0 -z-20 bg-ink-panel"
+                />
+            )}
 
-                <div className="min-w-0 flex-1">
-                    <p className="flex items-center gap-1.5 text-[0.6875rem] font-bold tracking-[0.08em] text-muted-foreground uppercase">
+            {/*
+                Legibility, and only that. The copy is white and the picture is
+                whatever the team shot that week, so the wash is heaviest where
+                the words are and lifts off the half of the frame that is only
+                ever picture.
+            */}
+            <span
+                aria-hidden
+                className="absolute inset-0 -z-10 bg-[linear-gradient(90deg,color-mix(in_srgb,var(--color-ink-panel)_72%,transparent)_0%,color-mix(in_srgb,var(--color-ink-panel)_40%,transparent)_48%,color-mix(in_srgb,var(--color-ink-panel)_8%,transparent)_100%)]"
+            />
+
+            {/*
+                The second wash, and it arrives with the counts. At rest the
+                right half of the frame is left as picture; the moment figures
+                are put on it they need a ground of their own, because white
+                type over whatever was photographed that week is not a
+                contrast anybody can promise.
+            */}
+            <span
+                aria-hidden
+                className="absolute inset-0 -z-10 bg-ink-panel/30 opacity-0 transition-opacity duration-300 ease-out group-hover/banner:opacity-100 group-focus-visible/banner:opacity-100 [@media(hover:none)]:opacity-100"
+            />
+
+            <div className="flex w-full items-end justify-between gap-4 p-3.5 text-white">
+                <span className="min-w-0 flex-1">
+                    <span className="flex items-center gap-1.5 text-[0.6875rem] font-bold tracking-[0.08em] text-white/85 uppercase [text-shadow:0_1px_3px_rgb(16_26_23/0.55)]">
                         <ChannelIcon
                             channel={live.channel}
                             className="size-3"
@@ -694,49 +731,38 @@ function LiveResult({ live }: { live: LivePost }) {
                         {live.format}
                         <span aria-hidden>·</span>
                         <span data-numeric>{live.date}</span>
-                    </p>
+                    </span>
 
-                    <p className="mt-1 line-clamp-2 text-[0.8438rem] leading-snug">
+                    <span className="mt-1 line-clamp-2 text-[0.8438rem] leading-snug font-bold [text-shadow:0_1px_3px_rgb(16_26_23/0.6)]">
                         {live.caption || 'Tanpa keterangan'}
-                    </p>
-                </div>
+                    </span>
+                </span>
+
+                <dl className="flex shrink-0 translate-x-2 items-end gap-5 pr-1 opacity-0 transition-[opacity,translate] duration-300 ease-out group-hover/banner:translate-x-0 group-hover/banner:opacity-100 group-focus-visible/banner:translate-x-0 group-focus-visible/banner:opacity-100 [@media(hover:none)]:translate-x-0 [@media(hover:none)]:opacity-100">
+                    {live.counts.map((count) => (
+                        <div key={count.label}>
+                            <dt className="text-[0.6875rem] whitespace-nowrap text-white/85 [text-shadow:0_1px_3px_rgb(16_26_23/0.6)]">
+                                {count.label}
+                            </dt>
+                            <dd
+                                className="text-lg leading-tight font-extrabold tracking-[-0.025em] [text-shadow:0_1px_3px_rgb(16_26_23/0.6)]"
+                                data-numeric
+                            >
+                                {nf.format(count.value)}
+                            </dd>
+                        </div>
+                    ))}
+
+                    {/* The figures are true as of the last sync, and say so
+                        where they are read rather than in a line below. */}
+                    {live.syncedAt ? (
+                        <div className="max-w-[7rem] text-[0.6875rem] leading-tight text-white/80 [text-shadow:0_1px_3px_rgb(16_26_23/0.6)]">
+                            per sinkron {live.syncedAt}
+                        </div>
+                    ) : null}
+                </dl>
             </div>
-
-            <dl className="flex flex-wrap items-center gap-x-6 gap-y-2 border-t border-border bg-neutral-soft/60 px-3.5 py-3">
-                {live.counts.map((count) => (
-                    <div key={count.label}>
-                        <dt className="text-[0.6875rem] text-muted-foreground">
-                            {count.label}
-                        </dt>
-                        <dd
-                            className="text-base leading-tight font-extrabold tracking-[-0.02em]"
-                            data-numeric
-                        >
-                            {nf.format(count.value)}
-                        </dd>
-                    </div>
-                ))}
-
-                <Link
-                    href={live.href}
-                    className="ml-auto inline-flex items-center gap-1 self-end text-xs font-bold text-primary-deep underline decoration-transparent underline-offset-4 transition-colors hover:decoration-current"
-                >
-                    Lihat di Performa
-                    <ChevronRight
-                        className="size-3.5"
-                        strokeWidth={2.5}
-                        aria-hidden
-                    />
-                </Link>
-            </dl>
-
-            {live.syncedAt ? (
-                <p className="border-t border-border px-3.5 py-2 text-[0.6875rem] text-muted-foreground">
-                    Angka per sinkronisasi terakhir Performa,{' '}
-                    <span data-numeric>{live.syncedAt}</span>.
-                </p>
-            ) : null}
-        </section>
+        </Link>
     );
 }
 
