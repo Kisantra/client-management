@@ -225,10 +225,13 @@ test('the page shows everything and says what it is showing', function () {
         ->assertOk()
         ->assertInertia(fn ($page) => $page
             ->component('content-news')
-            ->has('items', 2)
-            ->where('items.0.title', 'Berita baru')
-            ->where('items.0.source', 'DDTCNews')
-            ->where('items.0.category', 'Kebijakan')
+            /* Two stories on two different days, so the page carries two
+               day groups rather than a flat list. */
+            ->has('days', 2)
+            ->where('total', 2)
+            ->where('days.0.items.0.title', 'Berita baru')
+            ->where('days.0.items.0.source', 'DDTCNews')
+            ->where('days.0.items.0.category', 'Kebijakan')
             /* Zero days is how the page knows to say "seluruh arsip". */
             ->where('window.days', 0)
             ->where('window.since', null)
@@ -257,8 +260,9 @@ test('a windowed page hides a story kept only for its idea', function () {
         ->get(route('content.news'))
         ->assertOk()
         ->assertInertia(fn ($page) => $page
-            ->has('items', 1)
-            ->where('items.0.title', 'Di dalam jendela')
+            ->has('days', 1)
+            ->where('total', 1)
+            ->where('days.0.items.0.title', 'Di dalam jendela')
             ->where('window.days', 7)
         );
 });

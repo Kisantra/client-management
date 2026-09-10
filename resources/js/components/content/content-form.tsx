@@ -31,7 +31,7 @@ import {
 } from '@/components/ui/select';
 import { Textarea } from '@/components/ui/textarea';
 import type { ContentStatus, EditableContent } from '@/data/content';
-import { toIso } from '@/data/content';
+import { SLOTS, toIso } from '@/data/content';
 import { CHANNEL_LABELS } from '@/data/dashboard';
 import type { ChannelKey } from '@/data/dashboard';
 import { asDate, TODAY } from '@/data/leads';
@@ -42,9 +42,6 @@ import {
     update as contentUpdate,
 } from '@/routes/content';
 import type { SharedProps } from '@/types/shared';
-
-/** The hours this team actually publishes at; the field takes any other. */
-const SLOTS = ['07:00', '09:00', '12:00', '17:00', '19:00'];
 
 /** Neither select can carry an empty value; these stand for "not yet". */
 const NOBODY = '__tanpa__';

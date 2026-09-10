@@ -1,5 +1,6 @@
 <?php
 
+use App\Models\Activity;
 use App\Models\Content;
 use App\Models\KeyDate;
 use App\Models\Lead;
@@ -600,4 +601,151 @@ it('annotates the month with its key dates', function () {
             ->has('specialDays', 1)
             ->where('specialDays.2026-09-10.0.name', 'Batas setor PPh masa Agustus')
         );
+});
+
+/*
+ | The panel changes a piece's status from the chip that states it, and the
+ | menu behind that chip prints the whole flow with a line under each option.
+ | Everything it prints comes from config through the shared prop, so a hint
+ | that never arrives leaves four bare words and nothing to choose between.
+ */
+it('hands the panel the whole status flow, each step with its hint', function () {
+    $this->get(route('content'))
+        ->assertInertia(fn ($page) => $page
+            ->has('contentPlan.statuses', 4)
+            ->where('contentPlan.statuses.0.key', 'draft')
+            ->where('contentPlan.statuses.0.label', 'Draft')
+            ->where('contentPlan.statuses.0.hint', 'Sedang ditulis atau dibuat.')
+            // Last in the flow, and the only move that asks for more first.
+            ->where('contentPlan.statuses.3.key', 'published')
+        );
+});
+
+/*
+ | The panel's own lines write through the same route the board drops onto, so
+ | there is one place that decides what a field will take. These are the fields
+ | only the panel can reach — a card cannot be dropped into two channel columns
+ | at once, and it cannot be dropped onto an hour at all.
+ */
+it('sets the whole channel set at once, in the order it was picked', function () {
+    $content = piece(['channels' => ['instagram']]);
+
+    $this->post(route('content.field.store', $content), [
+        'field' => 'channels',
+        'value' => ['tiktok', 'instagram'],
+    ])->assertRedirect();
+
+    /* Order is not incidental: the calendar draws the piece in the first
+       channel's tint. */
+    expect($content->fresh()->channels)->toBe(['tiktok', 'instagram']);
+
+    // A piece with nowhere to go is not a state the calendar can draw.
+    $this->post(route('content.field.store', $content), [
+        'field' => 'channels',
+        'value' => [],
+    ])->assertSessionHasErrors('value');
+
+    $this->post(route('content.field.store', $content), [
+        'field' => 'channels',
+        'value' => ['instagram', 'myspace'],
+    ])->assertSessionHasErrors('value.1');
+
+    expect($content->fresh()->channels)->toBe(['tiktok', 'instagram']);
+});
+
+it('moves the day and the hour as one change', function () {
+    $content = piece(['scheduled_for' => '2026-08-25', 'scheduled_time' => '09:00']);
+
+    $this->post(route('content.field.store', $content), [
+        'field' => 'schedule',
+        'value' => ['date' => '2026-08-27', 'time' => '17:00'],
+    ])->assertRedirect();
+
+    expect($content->fresh()->scheduled_for->toDateString())->toBe('2026-08-27')
+        ->and($content->fresh()->scheduledTime())->toBe('17:00');
+
+    /* An hour nobody has settled on is a real state, not a missing value, so
+       clearing it has to be possible from the same control. */
+    $this->post(route('content.field.store', $content), [
+        'field' => 'schedule',
+        'value' => ['date' => '2026-08-27', 'time' => ''],
+    ])->assertRedirect();
+
+    expect($content->fresh()->scheduledTime())->toBeNull();
+
+    $this->post(route('content.field.store', $content), [
+        'field' => 'schedule',
+        'value' => ['date' => '2026-08-27', 'time' => 'sore'],
+    ])->assertSessionHasErrors('value.time');
+});
+
+/*
+ | The panel opens over one month of the calendar. Moving a piece out of that
+ | month leaves the grid behind it showing everything except the piece being
+ | read, so the calendar goes where the piece went.
+ */
+it('takes the calendar with a piece whose date leaves the month on screen', function () {
+    $content = piece(['scheduled_for' => '2026-08-25']);
+
+    $this->post(route('content.field.store', $content), [
+        'field' => 'schedule',
+        'value' => ['date' => '2026-09-03', 'time' => ''],
+    ])->assertRedirect(route('content', ['bulan' => '2026-09', 'konten' => $content->id]));
+
+    // Within the month, it leaves you exactly where you were.
+    $this->from(route('content', ['bulan' => '2026-09', 'q' => 'spt']))
+        ->post(route('content.field.store', $content), [
+            'field' => 'schedule',
+            'value' => ['date' => '2026-09-10', 'time' => ''],
+        ])
+        ->assertRedirect(route('content', ['bulan' => '2026-09', 'q' => 'spt']));
+});
+
+it('records where a piece went live, and lets that be taken back', function () {
+    $content = piece();
+
+    $this->post(route('content.field.store', $content), [
+        'field' => 'url',
+        'value' => 'https://www.instagram.com/p/abc123/',
+    ])->assertRedirect();
+
+    expect($content->fresh()->url)->toBe('https://www.instagram.com/p/abc123/');
+
+    $this->post(route('content.field.store', $content), [
+        'field' => 'url',
+        'value' => 'bukan alamat',
+    ])->assertSessionHasErrors('value');
+
+    $this->post(route('content.field.store', $content), [
+        'field' => 'reference_url',
+        'value' => '',
+    ])->assertRedirect();
+
+    expect($content->fresh()->reference_url)->toBeNull()
+        // The bad address never landed.
+        ->and($content->fresh()->url)->toBe('https://www.instagram.com/p/abc123/');
+});
+
+/*
+ | A field changed from the panel is still a change to the piece, and the log
+ | is where the team finds out who moved a date they were counting on.
+ */
+it('writes a change made from the panel into the activity log', function () {
+    $content = piece(['owner' => 'Dimas']);
+
+    $this->post(route('content.field.store', $content), [
+        'field' => 'owner',
+        'value' => 'Sari',
+    ])->assertRedirect();
+
+    $entry = Activity::query()
+        ->where('subject_type', 'konten')
+        ->where('subject_id', $content->id)
+        ->latest('id')
+        ->first();
+
+    expect($entry)->not->toBeNull()
+        ->and($entry->action)->toBe('updated')
+        ->and($entry->actor)->toBe('Admin')
+        ->and($entry->toRow()['changes'])->toHaveCount(1);
 });

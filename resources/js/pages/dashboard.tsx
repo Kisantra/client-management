@@ -1,8 +1,9 @@
 import { Head, Link, usePage } from '@inertiajs/react';
 import { Plus, Upload } from 'lucide-react';
-import { ChannelTable } from '@/components/dashboard/channel-table';
 import { ContentQueue } from '@/components/dashboard/content-queue';
 import type { Queue } from '@/components/dashboard/content-queue';
+import { FollowUps } from '@/components/dashboard/follow-ups';
+import type { FollowUpQueue } from '@/components/dashboard/follow-ups';
 import { LeadChart } from '@/components/dashboard/lead-chart';
 import type { LeadMonth } from '@/components/dashboard/lead-chart';
 import { Panel } from '@/components/dashboard/panel';
@@ -14,6 +15,7 @@ import type {
 import { StatTile } from '@/components/dashboard/stat-tile';
 import { MiniBars, MiniLine, MiniRing } from '@/components/dashboard/stat-viz';
 import { TeamLoad } from '@/components/dashboard/team-load';
+import type { TeamLoadData } from '@/components/dashboard/team-load';
 import { Button } from '@/components/ui/button';
 import { clients, content, dashboard, leads } from '@/routes';
 import { create as leadsCreate } from '@/routes/leads';
@@ -29,6 +31,10 @@ type Props = {
     pipeline: PipelineStage[];
     /** What the content calendar owes this week. */
     queue: Queue;
+    /** Who is carrying it, measured against whoever is carrying most. */
+    load: TeamLoadData;
+    /** The conversations owed today, and the ones already late. */
+    followUps: FollowUpQueue;
     summary: {
         leads: {
             value: number;
@@ -121,6 +127,8 @@ export default function Dashboard({
     monthlyClients,
     closed,
     queue,
+    load,
+    followUps,
 }: Props) {
     const { auth } = usePage().props;
     const firstName = auth.user?.name?.split(' ')[0] ?? '';
@@ -322,22 +330,53 @@ export default function Dashboard({
                 </div>
 
                 <div className="grid gap-4 xl:grid-cols-[1.5fr_1fr]">
+                    {/*
+                        This slot held a channel table whose every figure was
+                        invented, and the report now works the same table out
+                        from real data — so the two pages had begun to
+                        contradict each other. Rather than print the true
+                        version twice, the dashboard takes the question it was
+                        not answering at all: which conversations are owed.
+                    */}
                     <Panel
-                        title="Konten yang menghasilkan lead"
+                        title="Follow-up jatuh tempo"
                         action={
                             <Link
                                 href={leads()}
                                 className="shrink-0 rounded-md bg-primary-soft px-3 py-1.5 text-sm font-bold text-primary-deep transition-colors hover:bg-accent"
                             >
-                                Lihat detail
+                                Buka leads
                             </Link>
                         }
+                        footer={
+                            followUps.rest > 0 ? (
+                                <p className="text-xs text-muted-foreground">
+                                    <span
+                                        className="font-bold text-foreground"
+                                        data-numeric
+                                    >
+                                        {followUps.rest}
+                                    </span>{' '}
+                                    follow-up lain menunggu.
+                                </p>
+                            ) : undefined
+                        }
                     >
-                        <ChannelTable />
+                        <FollowUps queue={followUps} />
                     </Panel>
 
-                    <Panel title="Beban tim minggu ini" meta="kapasitas 8">
-                        <TeamLoad />
+                    {/* The scale is in the meta, not implied: the bars are
+                        measured against the busiest person, and a bar with an
+                        unstated denominator says nothing. */}
+                    <Panel
+                        title="Beban tim minggu ini"
+                        meta={
+                            load.busiest > 0
+                                ? `${load.window} · terbanyak ${load.busiest}`
+                                : load.window
+                        }
+                    >
+                        <TeamLoad load={load} />
                     </Panel>
                 </div>
             </div>

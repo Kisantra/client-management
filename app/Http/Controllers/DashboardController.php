@@ -4,9 +4,11 @@ namespace App\Http\Controllers;
 
 use App\Models\Content;
 use App\Models\Lead;
+use App\Models\LeadFollowUp;
 use App\Models\LeadStageEvent;
 use App\Support\Month;
 use App\Support\Pipeline;
+use App\Support\Team;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Support\Carbon;
 use Inertia\Inertia;
@@ -65,6 +67,8 @@ class DashboardController extends Controller
             'monthlyClients' => $this->monthlyClients(),
             'closed' => $this->closed($thisMonth),
             'queue' => $this->queue(),
+            'load' => $this->load(),
+            'followUps' => $this->followUps(),
         ]);
     }
 
@@ -157,6 +161,131 @@ class DashboardController extends Controller
     }
 
     /** Stage totals, and how many in each have stopped moving. */
+    /**
+     * The conversations the team owes, soonest first.
+     *
+     * The dashboard's question at nine in the morning is what is due, and it
+     * used to answer that for content alone. Half the day is not content: two
+     * hundred and thirty-one follow-ups are already past their date, and until
+     * now nothing on this page said so — you had to open a lead to find out
+     * you were late to it.
+     *
+     * Only what is owed. A follow-up booked for next Tuesday is not a thing to
+     * do today, and putting it here would bury the ones that are.
+     *
+     * @return array{
+     *     items: array<int, array<string, mixed>>,
+     *     overdue: int, today: int, rest: int
+     * }
+     */
+    private function followUps(): array
+    {
+        $today = Carbon::today();
+
+        $owed = LeadFollowUp::query()
+            ->where('done', false)
+            ->whereDate('scheduled_for', '<=', $today)
+            ->with(['lead:id,entity,company,stage,owner,status'])
+            ->orderBy('scheduled_for')
+            ->orderBy('id')
+            ->get()
+            /* A follow-up on a lead that has been closed is not owed to
+               anybody. The row survives for the record; the reminder does not
+               survive the decision. */
+            ->filter(fn (LeadFollowUp $item) => $item->lead?->status === Lead::ACTIVE)
+            ->values();
+
+        return [
+            'items' => $owed->take(self::QUEUE_SHOWN)
+                ->map(fn (LeadFollowUp $item) => [
+                    'id' => $item->id,
+                    'company' => trim($item->lead->entity.' '.$item->lead->company),
+                    'leadId' => $item->lead_id,
+                    'stage' => $item->lead->stage,
+                    'stageLabel' => Pipeline::label($item->lead->stage),
+                    'owner' => $item->lead->owner ?: null,
+                    'via' => $item->via,
+                    'note' => $item->note ?: null,
+                    'on' => $item->scheduled_for->toDateString(),
+                    'daysLate' => (int) $item->scheduled_for->startOfDay()->diffInDays($today),
+                ])
+                ->all(),
+            'overdue' => $owed->filter(fn (LeadFollowUp $item) => $item->scheduled_for->startOfDay()->lt($today))->count(),
+            'today' => $owed->filter(fn (LeadFollowUp $item) => $item->scheduled_for->isToday())->count(),
+            'rest' => max($owed->count() - self::QUEUE_SHOWN, 0),
+        ];
+    }
+
+    /**
+     * Who is carrying what this week.
+     *
+     * The panel used to be five invented names against an invented capacity of
+     * eight — every figure in it a literal in a front-end file. It reads the
+     * calendar now, and it does not invent a target: nobody has told this app
+     * how many pieces a week is one person's fair share, so it says who is
+     * carrying most rather than who is over a line that was never drawn.
+     *
+     * The bar is measured against the busiest person, and the panel says so.
+     * A length has to be measured against something stated, and the largest
+     * load is the only denominator the data itself can supply.
+     *
+     * @return array{
+     *     window: string, total: int, busiest: int,
+     *     members: array<int, array{name: string, initials: string, due: int, late: int}>
+     * }
+     */
+    private function load(): array
+    {
+        $today = Carbon::today();
+        $week = [$today->copy()->startOfWeek(), $today->copy()->endOfWeek()];
+
+        $pieces = Content::query()
+            ->whereBetween('scheduled_for', $week)
+            ->get(['owner', 'scheduled_for', 'status']);
+
+        $due = $pieces
+            ->groupBy(fn (Content $piece) => (string) $piece->owner)
+            ->map(fn ($group) => [
+                'due' => $group->count(),
+                'late' => $group->filter(fn (Content $piece) => $piece->isLate())->count(),
+            ]);
+
+        /* The roster, not only the people who happen to have work: a name with
+           nothing this week is the reading somebody came here for. */
+        $members = collect(Team::members())
+            ->map(fn (array $member) => [
+                'name' => $member['name'],
+                'initials' => self::initials($member['name']),
+                'due' => (int) ($due[$member['name']]['due'] ?? 0),
+                'late' => (int) ($due[$member['name']]['late'] ?? 0),
+            ])
+            ->sortBy([['due', 'desc'], ['name', 'asc']])
+            ->values();
+
+        return [
+            'window' => $week[0]->day.'–'.$week[1]->day.' '.self::MONTHS[$week[1]->month - 1],
+            'total' => $pieces->count(),
+            'busiest' => (int) $members->max('due'),
+            'members' => $members->all(),
+        ];
+    }
+
+    /** Two letters at most: one name gives one, two or more give the ends. */
+    private static function initials(string $name): string
+    {
+        $parts = preg_split('/\s+/u', trim($name)) ?: [];
+        $parts = array_values(array_filter($parts));
+
+        if ($parts === []) {
+            return '?';
+        }
+
+        $first = mb_substr($parts[0], 0, 1);
+        $last = count($parts) > 1 ? mb_substr(end($parts), 0, 1) : '';
+
+        return mb_strtoupper($first.$last);
+    }
+
     private function pipeline(): array
     {
         $today = Carbon::today()->toDateString();

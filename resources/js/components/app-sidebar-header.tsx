@@ -15,7 +15,13 @@ export function AppSidebarHeader({
 
     return (
         <div className="shrink-0 border-b border-sidebar-border/70">
-            <header className="flex h-16 items-center gap-3 px-4 transition-[width,height] ease-linear group-has-data-[collapsible=icon]/sidebar-wrapper:h-14 sm:px-6">
+            <header
+                /* Inert everywhere except a page that defines a print rule for it,
+               which today is only the report. Marking the element beats
+               guessing at its place in the shell from a selector. */
+                data-print="hide"
+                className="flex h-16 items-center gap-3 px-4 transition-[width,height] ease-linear group-has-data-[collapsible=icon]/sidebar-wrapper:h-14 sm:px-6"
+            >
                 <div className="flex min-w-0 items-center gap-2">
                     <SidebarTrigger className="-ml-1" />
                     <Breadcrumbs breadcrumbs={breadcrumbs} />

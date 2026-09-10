@@ -160,3 +160,12 @@ export function toIso(date: Date): string {
         String(date.getDate()).padStart(2, '0'),
     ].join('-');
 }
+
+/**
+ * The hours this team actually publishes at.
+ *
+ * Offered as one press each wherever an hour is set — the form and the panel
+ * both — so the two doors can never drift into offering different hours. Any
+ * other hour is still typed straight into the field.
+ */
+export const SLOTS = ['07:00', '09:00', '12:00', '17:00', '19:00'];

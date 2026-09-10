@@ -4,6 +4,7 @@ import {
     CalendarDays,
     ChartNoAxesColumn,
     LayoutGrid,
+    FileText,
     History,
     ListChecks,
     Settings,
@@ -27,6 +28,7 @@ import {
     dashboard,
     leads,
     performance,
+    report,
     tasks,
     team,
 } from '@/routes';
@@ -102,6 +104,11 @@ function buildNav(counts: SharedProps['counts']): NavGroup[] {
                     href: tasks(),
                     icon: ListChecks,
                     badge: navCounts.tasks,
+                },
+                {
+                    title: 'Laporan',
+                    href: report(),
+                    icon: FileText,
                 },
                 {
                     title: 'Aktivitas',

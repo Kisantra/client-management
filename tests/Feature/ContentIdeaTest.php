@@ -111,8 +111,8 @@ it('turns a news story into an idea once, and only once', function () {
         ->assertOk()
         ->assertInertia(fn ($page) => $page
             ->component('content-news')
-            ->has('items', 1)
-            ->where('items.0.ideaId', null)
+            ->where('total', 1)
+            ->where('days.0.items.0.ideaId', null)
         );
 
     $this->post(route('content.news.idea', $news))->assertRedirect();

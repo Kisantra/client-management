@@ -32,20 +32,6 @@ export type Task = {
     stuckAt?: string;
 };
 
-export type Channel = {
-    key: ChannelKey;
-    label: string;
-    published: number;
-    leads: number;
-};
-
-export type TeamMember = {
-    name: string;
-    initials: string;
-    assigned: number;
-    capacity: number;
-};
-
 export const CHANNEL_LABELS: Record<ChannelKey, string> = {
     instagram: 'Instagram',
     facebook: 'Facebook',
@@ -126,22 +112,7 @@ export const todayTasks: Task[] = [
     },
 ];
 
-export const channels: Channel[] = [
-    { key: 'instagram', label: 'Instagram', published: 11, leads: 34 },
-    { key: 'web', label: 'Web/SEO', published: 6, leads: 29 },
-    { key: 'linkedin', label: 'LinkedIn', published: 7, leads: 18 },
-    { key: 'tiktok', label: 'TikTok', published: 3, leads: 5 },
-];
-
-export const team: TeamMember[] = [
-    { name: 'Dimas', initials: 'DM', assigned: 9, capacity: 8 },
-    { name: 'Sari', initials: 'SR', assigned: 7, capacity: 8 },
-    { name: 'Putri', initials: 'PT', assigned: 6, capacity: 8 },
-    { name: 'Bayu', initials: 'BY', assigned: 4, capacity: 8 },
-    { name: 'Andre', initials: 'AR', assigned: 3, capacity: 8 },
-];
-
-/** Leads, clients and content come from the server; these two have no module yet. */
+/** Task is the last figure here with no module behind it. */
 export const navCounts = {
     tasks: 12,
 };

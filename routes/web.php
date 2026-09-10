@@ -17,6 +17,7 @@ use App\Http\Controllers\LeadStageController;
 use App\Http\Controllers\NewsController;
 use App\Http\Controllers\NotificationController;
 use App\Http\Controllers\PerformanceController;
+use App\Http\Controllers\ReportController;
 use App\Http\Controllers\SocialVideoController;
 use App\Http\Controllers\TeamController;
 use Illuminate\Support\Facades\Auth;
@@ -116,6 +117,14 @@ Route::middleware(['auth', 'verified'])->group(function () {
     Route::post('performance/refresh', [PerformanceController::class, 'refresh'])
         ->name('performance.refresh');
     Route::inertia('tasks', 'tasks')->name('tasks');
+
+    /* The month and the week, counted rather than typed up by hand. The rows
+       behind each table leave as CSV; the sheet itself prints. */
+    Route::get('laporan', ReportController::class)->name('report');
+    Route::get('laporan/ekspor/{part}', [ReportController::class, 'export'])
+        ->whereIn('part', ['konten', 'lead'])
+        ->name('report.export');
+
     /* The log of what the team did, read as a page of its own rather than a
        panel bolted onto each record. */
     Route::get('aktivitas', ActivityController::class)->name('activity');

@@ -1,10 +1,8 @@
-import { Link, router } from '@inertiajs/react';
+import { Link } from '@inertiajs/react';
 import {
     BookMarked,
     CalendarDays,
-    Check,
     ChevronRight,
-    ExternalLink,
     Layers,
     Link2,
     Loader,
@@ -18,27 +16,24 @@ import {
 } from 'lucide-react';
 import { useState } from 'react';
 import { channelNames } from '@/components/content/channel-marks';
-import { CHANNEL_TONE } from '@/components/content/channel-tone';
 import { CommentThread } from '@/components/content/comment-thread';
+import {
+    ChannelField,
+    LinkField,
+    OwnerField,
+    PillarField,
+    ReferenceField,
+    ScheduleField,
+    TypeField,
+} from '@/components/content/content-fields';
 import { ContentForm } from '@/components/content/content-form';
 import { DeleteDialog } from '@/components/content/delete-dialog';
 import { PublishDialog } from '@/components/content/publish-dialog';
-import {
-    LateMark,
-    STATUS_DOT,
-    StatusPill,
-} from '@/components/content/status-mark';
+import { LateMark, STATUS_DOT } from '@/components/content/status-mark';
+import { StatusSelect } from '@/components/content/status-select';
 import { ChannelIcon } from '@/components/leads/channel-icon';
 import { StageMark } from '@/components/leads/stage-mark';
 import { Button } from '@/components/ui/button';
-import {
-    DropdownMenu,
-    DropdownMenuContent,
-    DropdownMenuItem,
-    DropdownMenuLabel,
-    DropdownMenuSeparator,
-    DropdownMenuTrigger,
-} from '@/components/ui/dropdown-menu';
 import {
     Sheet,
     SheetClose,
@@ -50,19 +45,13 @@ import type {
     ContentComment,
     ContentDetail,
     ContentEvent,
-    ContentStatus,
 } from '@/data/content';
-import { timeLabel } from '@/data/content';
-import { CHANNEL_LABELS } from '@/data/dashboard';
 import type { ChannelKey } from '@/data/dashboard';
 import { nf } from '@/data/instagram';
 import type { Lead } from '@/data/leads';
 import { entryDate, longDate, shortRupiah } from '@/data/leads';
-import { useContentPlan } from '@/hooks/use-content-plan';
-import { useInitials } from '@/hooks/use-initials';
 import { cn } from '@/lib/utils';
 import { leads as leadsIndex } from '@/routes';
-import { store as moveStatus } from '@/routes/content/status';
 import { show as leadShow } from '@/routes/leads';
 
 /** Everything the panel shows for one piece, as the server sends it. */
@@ -213,8 +202,6 @@ function Body({
     onEdit: () => void;
 }) {
     const { content, events, leads, comments, live } = selected;
-    const { statuses } = useContentPlan();
-    const initials = useInitials();
 
     /* Reviewer feedback outranks history: a panel opened while notes are
        still open lands on them. */
@@ -225,26 +212,6 @@ function Body({
     );
     const [publishOpen, setPublishOpen] = useState(false);
     const [deleteOpen, setDeleteOpen] = useState(false);
-    const [moving, setMoving] = useState(false);
-
-    const move = (status: ContentStatus) => {
-        if (status === 'published') {
-            setPublishOpen(true);
-
-            return;
-        }
-
-        router.post(
-            moveStatus(content.id).url,
-            { status },
-            {
-                preserveScroll: true,
-                preserveState: true,
-                onStart: () => setMoving(true),
-                onFinish: () => setMoving(false),
-            },
-        );
-    };
 
     const leadCount = content.leads ?? leads.length;
     const clientCount = content.clients ?? 0;
@@ -264,49 +231,6 @@ function Body({
                 </SheetClose>
 
                 <div className="ml-auto flex items-center gap-1.5">
-                    <DropdownMenu>
-                        <DropdownMenuTrigger asChild>
-                            <Button className="shadow-teal" disabled={moving}>
-                                {moving ? 'Memindahkan…' : 'Ubah status'}
-                            </Button>
-                        </DropdownMenuTrigger>
-                        <DropdownMenuContent align="end" className="w-60">
-                            <DropdownMenuLabel className="text-xs">
-                                Pindah ke status
-                            </DropdownMenuLabel>
-                            <DropdownMenuSeparator />
-                            {statuses.map((status) => {
-                                const key = status.key as ContentStatus;
-                                const current = key === content.status;
-
-                                return (
-                                    <DropdownMenuItem
-                                        key={key}
-                                        disabled={current}
-                                        className="gap-2"
-                                        onSelect={() => move(key)}
-                                    >
-                                        <span
-                                            className={cn(
-                                                'size-2 shrink-0 rounded-full',
-                                                STATUS_DOT[key],
-                                            )}
-                                            aria-hidden
-                                        />
-                                        {status.label}
-                                        {current ? (
-                                            <Check
-                                                className="ml-auto size-3.5"
-                                                strokeWidth={2.5}
-                                                aria-hidden
-                                            />
-                                        ) : null}
-                                    </DropdownMenuItem>
-                                );
-                            })}
-                        </DropdownMenuContent>
-                    </DropdownMenu>
-
                     <Button
                         variant="outline"
                         size="icon"
@@ -357,9 +281,17 @@ function Body({
                     {live ? <LiveResult live={live} /> : null}
 
                     <dl className="mt-6 grid grid-cols-[7.5rem_minmax(0,1fr)] gap-x-4 gap-y-4 text-[0.8438rem] sm:grid-cols-[9.5rem_minmax(0,1fr)]">
+                        {/* The one line on the record that is also a control:
+                            the status is moved from the chip that states it,
+                            rather than from a button in the toolbar that had
+                            nothing around it to say what it would change. */}
                         <Prop icon={Loader} label="Status">
-                            <span className="flex flex-wrap items-center gap-2">
-                                <StatusPill status={content.status} />
+                            <span className="flex flex-wrap items-center gap-x-2 gap-y-1.5">
+                                <StatusSelect
+                                    contentId={content.id}
+                                    status={content.status}
+                                    onPublish={() => setPublishOpen(true)}
+                                />
                                 {content.late ? (
                                     <LateMark days={content.daysLate} />
                                 ) : content.stuck ? (
@@ -381,82 +313,25 @@ function Body({
                         </Prop>
 
                         <Prop icon={CalendarDays} label="Jadwal tayang">
-                            <span className="flex flex-wrap items-center gap-x-2 gap-y-0.5">
-                                <span data-numeric>
-                                    {longDate(content.scheduledFor)}
-                                    {content.scheduledTime
-                                        ? `, ${timeLabel(content.scheduledTime)}`
-                                        : ''}
-                                </span>
-                                {content.publishedAt &&
-                                content.publishedAt !== content.scheduledFor ? (
-                                    <span
-                                        className="text-xs font-normal text-muted-foreground"
-                                        data-numeric
-                                    >
-                                        tayang {longDate(content.publishedAt)}
-                                    </span>
-                                ) : content.publishedAt ? (
-                                    <span className="text-xs font-normal text-muted-foreground">
-                                        tayang tepat waktu
-                                    </span>
-                                ) : null}
-                            </span>
+                            <ScheduleField content={content} />
                         </Prop>
 
                         {/* Here there is room for the words, so every channel
                             is named rather than left as a mark. */}
                         <Prop icon={Layers} label="Channel">
-                            <span className="flex flex-wrap items-center gap-1.5">
-                                {content.channels.map((channel) => (
-                                    <span
-                                        key={channel}
-                                        className={cn(
-                                            'inline-flex items-center gap-1.5 rounded-full py-0.5 pr-2.5 pl-1.5 text-xs font-bold',
-                                            CHANNEL_TONE[channel].filled,
-                                        )}
-                                    >
-                                        <ChannelIcon channel={channel} />
-                                        {CHANNEL_LABELS[channel]}
-                                    </span>
-                                ))}
-                            </span>
+                            <ChannelField content={content} />
                         </Prop>
 
                         <Prop icon={Shapes} label="Jenis konten">
-                            <span className="rounded-full bg-neutral-soft px-2.5 py-0.5 text-xs font-bold text-secondary-foreground">
-                                {content.typeLabel}
-                            </span>
+                            <TypeField content={content} />
                         </Prop>
 
                         <Prop icon={Tag} label="Pillar">
-                            {content.pillarLabel ? (
-                                <span className="rounded-full bg-neutral-soft px-2.5 py-0.5 text-xs font-bold text-secondary-foreground">
-                                    {content.pillarLabel}
-                                </span>
-                            ) : (
-                                <span className="font-normal text-muted-foreground">
-                                    Belum ditentukan
-                                </span>
-                            )}
+                            <PillarField content={content} />
                         </Prop>
 
                         <Prop icon={UserRound} label="Submitted by">
-                            {content.owner ? (
-                                <span className="inline-flex items-center gap-2">
-                                    <span
-                                        className="grid size-6 shrink-0 place-items-center rounded-full bg-primary-soft text-[0.6875rem] font-extrabold text-primary-deep"
-                                        aria-hidden
-                                    >
-                                        {initials(content.owner)}
-                                    </span>
-                                    {content.owner}
-                                </span>
-                            ) : (
-                                <span className="font-normal text-muted-foreground">
-                                    Belum ditentukan
-                                </span>
-                            )}
+                            <OwnerField content={content} />
                         </Prop>
 
                         <Prop icon={Target} label="Hasil">
@@ -493,57 +368,11 @@ function Body({
                         </Prop>
 
                         <Prop icon={BookMarked} label="Referensi">
-                            {content.referenceUrl ? (
-                                <a
-                                    href={content.referenceUrl}
-                                    target="_blank"
-                                    rel="noopener noreferrer"
-                                    className="inline-flex max-w-full items-center gap-1 text-primary-deep underline decoration-transparent underline-offset-4 transition-colors hover:decoration-current"
-                                >
-                                    <span className="truncate">
-                                        {content.referenceUrl.replace(
-                                            /^https?:\/\/(www\.)?/,
-                                            '',
-                                        )}
-                                    </span>
-                                    <ExternalLink
-                                        className="size-3 shrink-0"
-                                        strokeWidth={2}
-                                        aria-hidden
-                                    />
-                                </a>
-                            ) : (
-                                <span className="font-normal text-muted-foreground">
-                                    Belum ada
-                                </span>
-                            )}
+                            <ReferenceField content={content} />
                         </Prop>
 
                         <Prop icon={Link2} label="Tautan">
-                            {content.url ? (
-                                <a
-                                    href={content.url}
-                                    target="_blank"
-                                    rel="noopener noreferrer"
-                                    className="inline-flex max-w-full items-center gap-1 text-primary-deep underline decoration-transparent underline-offset-4 transition-colors hover:decoration-current"
-                                >
-                                    <span className="truncate">
-                                        {content.url.replace(
-                                            /^https?:\/\/(www\.)?/,
-                                            '',
-                                        )}
-                                    </span>
-                                    <ExternalLink
-                                        className="size-3 shrink-0"
-                                        strokeWidth={2}
-                                        aria-hidden
-                                    />
-                                </a>
-                            ) : (
-                                <span className="font-normal text-muted-foreground">
-                                    Belum ada
-                                </span>
-                            )}
+                            <LinkField content={content} />
                         </Prop>
                     </dl>
 

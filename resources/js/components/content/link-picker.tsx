@@ -7,7 +7,7 @@ import {
     Search,
     X,
 } from 'lucide-react';
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { ChannelIcon } from '@/components/leads/channel-icon';
 import { Input } from '@/components/ui/input';
 import {
@@ -45,10 +45,6 @@ export type ReleasedPost = {
  * team publishes lives on the two accounts Performa follows, and a picker that
  * refuses anything it has not heard of cannot record the one link somebody
  * actually needed.
- *
- * The options are asked for the first time this is opened rather than shipped
- * with the calendar: two hundred scraped posts on every page load, for a field
- * most pieces never fill, is a page paying for a door nobody walked through.
  */
 export function LinkPicker({
     value,
@@ -64,38 +60,6 @@ export function LinkPicker({
     const released = usePage().props.released as ReleasedPost[] | undefined;
 
     const [open, setOpen] = useState(false);
-    const [asked, setAsked] = useState(false);
-    const [query, setQuery] = useState('');
-
-    /* Only fetched once per visit to the page: the list changes when Performa
-       syncs, not while a form is open. */
-    const request = () => {
-        if (released || asked) {
-            return;
-        }
-
-        setAsked(true);
-        router.reload({ only: ['released'] });
-    };
-
-    const matches = useMemo(() => {
-        const needle = query.trim().toLowerCase();
-
-        if (!released) {
-            return [];
-        }
-
-        if (!needle) {
-            return released;
-        }
-
-        return released.filter(
-            (post) =>
-                post.caption.toLowerCase().includes(needle) ||
-                post.url.toLowerCase().includes(needle) ||
-                post.date.toLowerCase().includes(needle),
-        );
-    }, [released, query]);
 
     /* When the field already holds one of the known posts, the field can show
        the post rather than a hundred characters of address. */
@@ -103,16 +67,7 @@ export function LinkPicker({
 
     return (
         <div className="flex flex-col gap-2">
-            <Popover
-                open={open}
-                onOpenChange={(next) => {
-                    setOpen(next);
-
-                    if (next) {
-                        request();
-                    }
-                }}
-            >
+            <Popover open={open} onOpenChange={setOpen}>
                 <PopoverTrigger asChild>
                     <button
                         type="button"
@@ -154,52 +109,13 @@ export function LinkPicker({
                     collisionPadding={12}
                     className="flex max-h-(--radix-popover-content-available-height) w-(--radix-popover-trigger-width) flex-col p-0"
                 >
-                    <div className="shrink-0 border-b border-border p-2">
-                        <div className="relative">
-                            <Search
-                                className="absolute top-1/2 left-2.5 size-3.5 -translate-y-1/2 text-muted-foreground"
-                                strokeWidth={2}
-                                aria-hidden
-                            />
-                            <Input
-                                value={query}
-                                onChange={(event) =>
-                                    setQuery(event.target.value)
-                                }
-                                placeholder="Cari keterangan atau tanggal…"
-                                className="h-8 pl-8 text-[0.8438rem]"
-                                aria-label="Cari konten yang sudah tayang"
-                            />
-                        </div>
-                    </div>
-
-                    {!released ? (
-                        <p className="flex items-center gap-2 px-3 py-6 text-xs text-muted-foreground">
-                            <Spinner className="size-3.5" />
-                            Mengambil konten dari Performa…
-                        </p>
-                    ) : released.length === 0 ? (
-                        <NotSynced />
-                    ) : matches.length === 0 ? (
-                        <p className="px-3 py-6 text-center text-xs text-muted-foreground">
-                            Tidak ada yang cocok dengan “{query.trim()}”.
-                        </p>
-                    ) : (
-                        <ul className="scroll-slim min-h-0 flex-1 overflow-y-auto p-1">
-                            {matches.map((post) => (
-                                <li key={post.url}>
-                                    <Option
-                                        post={post}
-                                        active={post.url === value}
-                                        onPick={() => {
-                                            onChange(post.url);
-                                            setOpen(false);
-                                        }}
-                                    />
-                                </li>
-                            ))}
-                        </ul>
-                    )}
+                    <ReleasedList
+                        value={value}
+                        onPick={(url) => {
+                            onChange(url);
+                            setOpen(false);
+                        }}
+                    />
                 </PopoverContent>
             </Popover>
 
@@ -248,6 +164,108 @@ export function LinkPicker({
                 ) : null}
             </div>
         </div>
+    );
+}
+
+/**
+ * The posts Performa already scraped, searchable, as a list to pick from.
+ *
+ * Shared by the form's picker and by the panel's own Tautan line: one list,
+ * one empty state, one explanation of why it might be empty.
+ *
+ * The options are asked for when this first mounts rather than shipped with
+ * the calendar — and this only mounts when somebody opens it. Two hundred
+ * scraped posts on every page load, for a field most pieces never fill, is a
+ * page paying for a door nobody walked through.
+ */
+export function ReleasedList({
+    value,
+    onPick,
+}: {
+    value: string;
+    onPick: (url: string) => void;
+}) {
+    const released = usePage().props.released as ReleasedPost[] | undefined;
+    const [query, setQuery] = useState('');
+
+    /* A ref, not state: nothing on screen turns on whether the ask has gone
+       out, and a second render for it would be a render for nobody. */
+    const asked = useRef(false);
+
+    useEffect(() => {
+        /* Once per visit to the page: the list changes when Performa syncs,
+           not while somebody is deciding. */
+        if (released || asked.current) {
+            return;
+        }
+
+        asked.current = true;
+        router.reload({ only: ['released'] });
+    }, [released]);
+
+    const matches = useMemo(() => {
+        const needle = query.trim().toLowerCase();
+
+        if (!released) {
+            return [];
+        }
+
+        if (!needle) {
+            return released;
+        }
+
+        return released.filter(
+            (post) =>
+                post.caption.toLowerCase().includes(needle) ||
+                post.url.toLowerCase().includes(needle) ||
+                post.date.toLowerCase().includes(needle),
+        );
+    }, [released, query]);
+
+    return (
+        <>
+            <div className="shrink-0 border-b border-border p-2">
+                <div className="relative">
+                    <Search
+                        className="absolute top-1/2 left-2.5 size-3.5 -translate-y-1/2 text-muted-foreground"
+                        strokeWidth={2}
+                        aria-hidden
+                    />
+                    <Input
+                        value={query}
+                        onChange={(event) => setQuery(event.target.value)}
+                        placeholder="Cari keterangan atau tanggal…"
+                        className="h-8 pl-8 text-[0.8438rem]"
+                        aria-label="Cari konten yang sudah tayang"
+                    />
+                </div>
+            </div>
+
+            {!released ? (
+                <p className="flex items-center gap-2 px-3 py-6 text-xs text-muted-foreground">
+                    <Spinner className="size-3.5" />
+                    Mengambil konten dari Performa…
+                </p>
+            ) : released.length === 0 ? (
+                <NotSynced />
+            ) : matches.length === 0 ? (
+                <p className="px-3 py-6 text-center text-xs text-muted-foreground">
+                    Tidak ada yang cocok dengan “{query.trim()}”.
+                </p>
+            ) : (
+                <ul className="scroll-slim min-h-0 flex-1 overflow-y-auto p-1">
+                    {matches.map((post) => (
+                        <li key={post.url}>
+                            <Option
+                                post={post}
+                                active={post.url === value}
+                                onPick={() => onPick(post.url)}
+                            />
+                        </li>
+                    ))}
+                </ul>
+            )}
+        </>
     );
 }
 

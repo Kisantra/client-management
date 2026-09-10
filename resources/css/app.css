@@ -429,6 +429,32 @@
         animation: dwell 6500ms linear forwards;
     }
 
+    /*
+     | A field on the record that has just changed. The value crosses to its new
+     | shape in the usual 200ms, and this is the beat behind it: one ring pushed
+     | out from the field's own edge and spent. Without it the new value arrives
+     | on its own and reads as a repaint — the confirmation landing somewhere
+     | off to the side rather than on the line that changed.
+     |
+     | Ring rather than scale: these values sit on lines of text, and a word
+     | that grows and settles blurs on the way back.
+     */
+    @keyframes field-landed {
+        from {
+            box-shadow: 0 0 0 0
+                color-mix(in srgb, var(--primary) 45%, transparent);
+        }
+
+        to {
+            box-shadow: 0 0 0 0.5rem
+                color-mix(in srgb, var(--primary) 0%, transparent);
+        }
+    }
+
+    .animate-field-landed {
+        animation: field-landed 560ms cubic-bezier(0.16, 1, 0.3, 1) both;
+    }
+
     /* The data panel's own moment: figures draw themselves in the direction they
        are read. Clip-path rather than scale, so radii and stroke weights hold. */
 
@@ -518,6 +544,7 @@
         .animate-pick-up,
         .animate-float-in,
         .animate-caption-in,
+        .animate-field-landed,
         .animate-dwell {
             animation: none;
         }
