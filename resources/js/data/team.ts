@@ -18,6 +18,9 @@ export type TeamMember = {
     /** Scheduled inside the running week, whatever the status. */
     week: number;
     publishedMonth: number;
+    /** Every piece under the name, finished or not. */
+    contentCount: number;
+    leadCount: number;
 };
 
 export type TeamTotals = {

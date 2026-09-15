@@ -60,6 +60,8 @@
     --color-channel-twitter-foreground: var(--channel-twitter-foreground);
     --color-channel-tiktok: var(--channel-tiktok);
     --color-channel-tiktok-foreground: var(--channel-tiktok-foreground);
+    --color-channel-youtube: var(--channel-youtube);
+    --color-channel-youtube-foreground: var(--channel-youtube-foreground);
     --color-channel-linkedin: var(--channel-linkedin);
     --color-channel-linkedin-foreground: var(--channel-linkedin-foreground);
     --color-channel-web: var(--channel-web);
@@ -151,6 +153,10 @@
     --channel-twitter-foreground: #1c1d21;
     --channel-tiktok: #daeff2;
     --channel-tiktok-foreground: #14232b;
+    /* Violet rather than YouTube's red: red is spoken for by lateness, and a
+       red channel chip would sit on top of the one alarm this app has. */
+    --channel-youtube: #f2eafb;
+    --channel-youtube-foreground: #5d2e91;
     --channel-linkedin: #e4eefa;
     --channel-linkedin-foreground: #0b4f8c;
     --channel-web: #fdf0dc;
@@ -219,6 +225,8 @@
     --channel-twitter-foreground: #d9dbe1;
     --channel-tiktok: #16323a;
     --channel-tiktok-foreground: #cfe3ea;
+    --channel-youtube: #2a1c3d;
+    --channel-youtube-foreground: #c8a9f0;
     --channel-linkedin: #16283d;
     --channel-linkedin-foreground: #9cc5f2;
     --channel-web: #3a2a12;

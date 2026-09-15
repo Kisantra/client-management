@@ -71,6 +71,37 @@ class Content extends Model
         return $this->hasMany(ContentComment::class)->latest()->latest('id');
     }
 
+    /**
+     * Where it went live, one address per channel.
+     *
+     * @return HasMany<ContentLink, $this>
+     */
+    public function links(): HasMany
+    {
+        return $this->hasMany(ContentLink::class);
+    }
+
+    /**
+     * The addresses as the browser reads them: channel to address.
+     *
+     * Ordered by the piece's own channels so the panel lists Instagram before
+     * TikTok when that is the order they were ticked in — the same order the
+     * calendar draws the marks in.
+     *
+     * @return array<string, string>
+     */
+    public function linkMap(): array
+    {
+        $links = $this->relationLoaded('links') ? $this->links : $this->links()->get();
+        $byChannel = $links->pluck('url', 'channel');
+
+        return collect($this->channels ?? [])
+            ->mapWithKeys(fn (string $channel) => [$channel => $byChannel->get($channel)])
+            ->merge($byChannel->except($this->channels ?? []))
+            ->filter()
+            ->all();
+    }
+
     public function isPublished(): bool
     {
         return $this->status === self::PUBLISHED;
@@ -152,7 +183,9 @@ class Content extends Model
             'scheduledTime' => $this->scheduledTime(),
             'publishedAt' => $this->published_at?->toDateString(),
             'owner' => $this->owner ?: null,
-            'url' => $this->url ?: null,
+            /* One address per channel. A piece on Instagram and TikTok has two,
+               and which of them you meant is a real question. */
+            'links' => $this->linkMap(),
             'late' => $this->isLate(),
             'daysLate' => $this->daysLate(),
             'daysInStatus' => $this->daysInStatus(),

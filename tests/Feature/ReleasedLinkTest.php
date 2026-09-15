@@ -97,8 +97,7 @@ it('marks a post that another piece already points at', function () {
         'status' => 'published',
         'scheduled_for' => Carbon::today(),
         'status_changed_at' => Carbon::today(),
-        'url' => 'https://www.instagram.com/p/TAKEN/',
-    ]);
+    ])->links()->create(['channel' => 'instagram', 'url' => 'https://www.instagram.com/p/TAKEN/']);
 
     $taken = collect(ReleasedPosts::all())->keyBy('url');
 
@@ -162,10 +161,10 @@ it('still accepts a link that is not one of them', function () {
         'type' => 'carousel',
         'scheduled_for' => Carbon::today()->toDateString(),
         'status' => 'review',
-        'url' => 'https://kisantra.com/artikel/batas-lapor-spt',
+        'links' => ['instagram' => 'https://kisantra.com/artikel/batas-lapor-spt'],
     ])->assertRedirect();
 
-    expect($content->fresh()->url)->toBe('https://kisantra.com/artikel/batas-lapor-spt');
+    expect($content->fresh()->linkMap())->toBe(['instagram' => 'https://kisantra.com/artikel/batas-lapor-spt']);
 });
 
 /*
@@ -192,25 +191,26 @@ it('shows the linked post and what it earned on the piece own panel', function (
         'status' => 'published',
         'scheduled_for' => Carbon::parse('2026-09-02'),
         'status_changed_at' => Carbon::parse('2026-09-02'),
-        'url' => 'https://www.instagram.com/p/LIVE/',
     ]);
+
+    $piece->links()->create(['channel' => 'instagram', 'url' => 'https://www.instagram.com/p/LIVE/']);
 
     $this->get(route('content', ['bulan' => '2026-09', 'konten' => $piece->id]))
         ->assertOk()
         ->assertInertia(fn ($page) => $page
-            ->where('selected.live.channel', 'instagram')
-            ->where('selected.live.format', 'reel')
-            ->where('selected.live.counts.0', ['label' => 'suka', 'value' => 233])
-            ->where('selected.live.counts.1', ['label' => 'komentar', 'value' => 33])
-            ->where('selected.live.counts.2', ['label' => 'pemutaran', 'value' => 10970])
+            ->where('selected.live.0.channel', 'instagram')
+            ->where('selected.live.0.format', 'reel')
+            ->where('selected.live.0.counts.0', ['label' => 'suka', 'value' => 233])
+            ->where('selected.live.0.counts.1', ['label' => 'komentar', 'value' => 33])
+            ->where('selected.live.0.counts.2', ['label' => 'pemutaran', 'value' => 10970])
             // Straight through to the same post inside Performa.
-            ->where('selected.live.href', '/performance/konten?platform=instagram&konten='.InstagramPost::sole()->short_code)
+            ->where('selected.live.0.href', '/performance/konten?platform=instagram&konten='.InstagramPost::sole()->short_code)
             /* Written out on this side. Shipping an ISO timestamp crashed the
                panel: the page's date helper splits on the hyphen and expects a
                bare Y-m-d, so the extra time part made an Invalid Date and Intl
                threw on it — a white screen with the whole record behind it. */
-            ->where('selected.live.date', '2 Sep 2026')
-            ->where('selected.live.syncedAt', '7 Sep 2026')
+            ->where('selected.live.0.date', '2 Sep 2026')
+            ->where('selected.live.0.syncedAt', '7 Sep 2026')
         );
 });
 
@@ -223,11 +223,12 @@ it('says nothing when the link is not a post Performa follows', function () {
         'status' => 'published',
         'scheduled_for' => Carbon::today(),
         'status_changed_at' => Carbon::today(),
-        'url' => 'https://kisantra.com/artikel/batas-lapor-spt',
     ]);
 
+    $piece->links()->create(['channel' => 'web', 'url' => 'https://kisantra.com/artikel/batas-lapor-spt']);
+
     $this->get(route('content', ['bulan' => Carbon::today()->format('Y-m'), 'konten' => $piece->id]))
-        ->assertInertia(fn ($page) => $page->where('selected.live', null));
+        ->assertInertia(fn ($page) => $page->has('selected.live', 0));
 });
 
 it('leaves a photo without a play count rather than reporting nought', function () {
@@ -241,9 +242,64 @@ it('leaves a photo without a play count rather than reporting nought', function 
         'status' => 'published',
         'scheduled_for' => Carbon::today(),
         'status_changed_at' => Carbon::today(),
-        'url' => 'https://www.instagram.com/p/PHOTO/',
     ]);
 
+    $piece->links()->create(['channel' => 'instagram', 'url' => 'https://www.instagram.com/p/PHOTO/']);
+
     $this->get(route('content', ['bulan' => Carbon::today()->format('Y-m'), 'konten' => $piece->id]))
-        ->assertInertia(fn ($page) => $page->has('selected.live.counts', 2));
+        ->assertInertia(fn ($page) => $page->has('selected.live.0.counts', 2));
+});
+
+/*
+ | One banner per linked post. The same piece on Instagram and on TikTok did two
+ | different things, and the two sets of figures side by side are the reason a
+ | piece keeps both links.
+ */
+it('shows a result for every linked post Performa follows, in channel order', function () {
+    igPost(['url' => 'https://www.instagram.com/p/BOTH/', 'likes' => 50, 'comments' => 5]);
+
+    TiktokPost::create([
+        'tiktok_profile_id' => TiktokProfile::create([
+            'username' => config('services.apify.tiktok.username'),
+            'nickname' => 'Kisantra',
+            'followers' => 2_000,
+            'fetched_at' => Carbon::now(),
+        ])->id,
+        'post_id' => 'TT-BOTH',
+        'caption' => 'Versi TikTok',
+        'url' => 'https://www.tiktok.com/@kisantra/video/BOTH',
+        'likes' => 9,
+        'comments' => 1,
+        'plays' => 400,
+        'shares' => 0,
+        'saves' => 0,
+        'is_slideshow' => false,
+        'posted_at' => Carbon::parse('2026-09-03 10:00:00'),
+        'fetched_at' => Carbon::now(),
+    ]);
+
+    $piece = Content::create([
+        'title' => 'Satu konten, dua platform',
+        'channels' => ['tiktok', 'instagram'],
+        'pillar' => 'informasi',
+        'type' => 'videos',
+        'status' => 'published',
+        'scheduled_for' => Carbon::today(),
+        'status_changed_at' => Carbon::today(),
+    ]);
+
+    $piece->links()->create(['channel' => 'instagram', 'url' => 'https://www.instagram.com/p/BOTH/']);
+    $piece->links()->create(['channel' => 'tiktok', 'url' => 'https://www.tiktok.com/@kisantra/video/BOTH']);
+
+    $this->get(route('content', ['bulan' => Carbon::today()->format('Y-m'), 'konten' => $piece->id]))
+        ->assertInertia(fn ($page) => $page
+            ->has('selected.live', 2)
+            // TikTok was ticked first, so it leads.
+            ->where('selected.live.0.channel', 'tiktok')
+            ->where('selected.live.1.channel', 'instagram')
+            ->where('selected.content.links', [
+                'tiktok' => 'https://www.tiktok.com/@kisantra/video/BOTH',
+                'instagram' => 'https://www.instagram.com/p/BOTH/',
+            ])
+        );
 });

@@ -18,7 +18,7 @@ export function MiniBars({
     className?: string;
     label: string;
 }) {
-    const max = Math.max(...values);
+    const max = Math.max(...values, 0);
 
     return (
         <span
@@ -31,7 +31,14 @@ export function MiniBars({
                     key={index}
                     className={cn('w-1.5 rounded-full', barClassName)}
                     style={{
-                        height: `${Math.max((value / max) * 100, 14)}%`,
+                        /* A row of zeros is a real answer — a quiet week — and
+                           it still draws, as a row of stubs. Dividing by a max
+                           of zero made every height NaN and the bars vanished,
+                           which read as the chart failing to load. */
+                        height:
+                            max > 0
+                                ? `${Math.max((value / max) * 100, 14)}%`
+                                : '14%',
                     }}
                 />
             ))}

@@ -44,7 +44,8 @@ class ReportController extends Controller
             'channels' => $report->byChannel(),
             'owners' => $report->byOwner(),
             'sources' => $report->leadSources(),
-            'earning' => $report->earning(),
+            'top' => $report->topContent(),
+            'patterns' => $report->patterns(),
             'generatedAt' => Report::shortDate(Carbon::now()),
         ]);
     }

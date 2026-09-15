@@ -5,7 +5,12 @@ import { cn } from '@/lib/utils';
 import { store as setField } from '@/routes/content/field';
 
 /** What one field carries: a word, a set of them, or a day and an hour. */
-export type FieldValue = string | string[] | { date: string; time: string };
+export type FieldValue =
+    | string
+    | string[]
+    | { date: string; time: string }
+    /** One channel's address, for a piece that keeps one per channel. */
+    | { channel: string; url: string };
 
 /**
  * The one write behind every field on the record, and the states it passes

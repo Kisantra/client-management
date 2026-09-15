@@ -37,7 +37,7 @@ class ContentFieldController extends Controller
         'channels' => 'Channel',
         'schedule' => 'Jadwal tayang',
         'reference_url' => 'Referensi',
-        'url' => 'Tautan',
+        'link' => 'Tautan',
     ];
 
     public function store(Request $request, Content $content)
@@ -48,6 +48,10 @@ class ContentFieldController extends Controller
             ['field' => ['required', Rule::in(array_keys(self::LABELS))]] + $this->rulesFor($field),
             $this->messagesFor($field),
         );
+
+        if ($field === 'link') {
+            return $this->link($content, $validated['value']);
+        }
 
         $columns = $this->columnsFor($field, $validated['value'] ?? null);
         $wasMonth = $content->scheduled_for->format('Y-m');
@@ -99,7 +103,13 @@ class ContentFieldController extends Controller
                 'value.date' => ['required', 'date'],
                 'value.time' => ['nullable', 'date_format:H:i'],
             ],
-            'reference_url', 'url' => ['value' => ['nullable', 'url', 'max:255']],
+            'reference_url' => ['value' => ['nullable', 'url', 'max:255']],
+            /* One channel's address at a time. A blank address is not an
+               error: it is how a link that was wrong gets taken back. */
+            'link' => [
+                'value.channel' => ['required', Rule::in(ContentPlan::channelKeys())],
+                'value.url' => ['nullable', 'url', 'max:255'],
+            ],
             default => ['value' => ['nullable']],
         };
     }
@@ -123,9 +133,39 @@ class ContentFieldController extends Controller
                 'value.time.date_format' => 'Jam tayang harus dalam format 24 jam, misalnya 09:00.',
             ],
             'reference_url' => ['value.url' => 'Referensi harus berupa alamat lengkap, diawali https://.'],
-            'url' => ['value.url' => 'Tautan harus berupa alamat lengkap, diawali https://.'],
+            'link' => [
+                'value.channel.required' => 'Tautan ini untuk channel yang mana?',
+                'value.channel.in' => 'Channel itu tidak dikenal.',
+                'value.url.url' => 'Tautan harus berupa alamat lengkap, diawali https://.',
+            ],
             default => ['value.in' => 'Pilihan itu tidak dikenal.'],
         };
+    }
+
+    /**
+     * One channel's address, set or taken back.
+     *
+     * Its own path because it writes a row of its own rather than a column on
+     * the piece: a piece on Instagram and TikTok keeps two addresses, and
+     * changing one must leave the other exactly where it was.
+     *
+     * @param  array{channel: string, url?: string|null}  $value
+     */
+    private function link(Content $content, array $value)
+    {
+        $channel = $value['channel'];
+        $url = trim((string) ($value['url'] ?? ''));
+        $label = ContentPlan::channelLabel($channel);
+
+        if ($url === '') {
+            $content->links()->where('channel', $channel)->delete();
+            $this->toast($content->title.' diperbarui', 'Tautan '.$label.': dikosongkan.');
+        } else {
+            $content->links()->updateOrCreate(['channel' => $channel], ['url' => $url]);
+            $this->toast($content->title.' diperbarui', 'Tautan '.$label.' tersimpan.');
+        }
+
+        return back();
     }
 
     /**

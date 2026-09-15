@@ -1,6 +1,8 @@
 import { router } from '@inertiajs/react';
 import { CalendarDays, Check, TriangleAlert } from 'lucide-react';
 import { useState } from 'react';
+import { CHANNEL_TONE } from '@/components/content/channel-tone';
+import { ChannelIcon } from '@/components/leads/channel-icon';
 import { Button } from '@/components/ui/button';
 import { Calendar } from '@/components/ui/calendar';
 import {
@@ -18,7 +20,10 @@ import {
     PopoverTrigger,
 } from '@/components/ui/popover';
 import { toIso } from '@/data/content';
+import { CHANNEL_LABELS } from '@/data/dashboard';
+import type { ChannelKey } from '@/data/dashboard';
 import { TODAY } from '@/data/leads';
+import { cn } from '@/lib/utils';
 import { store as moveStatus } from '@/routes/content/status';
 
 const dateLabel = new Intl.DateTimeFormat('id-ID', {
@@ -29,25 +34,31 @@ const dateLabel = new Intl.DateTimeFormat('id-ID', {
 });
 
 /**
- * Marking a piece live. The date and the link are asked for here, together,
+ * Marking a piece live. The date and the links are asked for here, together,
  * because this is the one moment both are known and nobody comes back for
  * them later.
+ *
+ * One address per channel it went out on: the same cut on Instagram and on
+ * TikTok is two posts, and asking for "the link" would make somebody choose
+ * which of them to lose.
  */
 export function PublishDialog({
     open,
     onOpenChange,
     contentId,
     title,
-    url: initialUrl,
+    channels,
+    links: initialLinks,
 }: {
     open: boolean;
     onOpenChange: (open: boolean) => void;
     contentId: number;
     title: string;
-    url: string | null;
+    channels: ChannelKey[];
+    links: Partial<Record<ChannelKey, string>>;
 }) {
     const [at, setAt] = useState<Date>(TODAY);
-    const [url, setUrl] = useState(initialUrl ?? '');
+    const [links, setLinks] = useState(initialLinks);
     const [pickerOpen, setPickerOpen] = useState(false);
     const [saving, setSaving] = useState(false);
     const [failed, setFailed] = useState<string | null>(null);
@@ -55,7 +66,7 @@ export function PublishDialog({
     const close = (next: boolean) => {
         if (!next) {
             setAt(TODAY);
-            setUrl(initialUrl ?? '');
+            setLinks(initialLinks);
             setFailed(null);
         }
 
@@ -65,7 +76,16 @@ export function PublishDialog({
     const submit = () => {
         router.post(
             moveStatus(contentId).url,
-            { status: 'published', published_at: toIso(at), url: url.trim() },
+            {
+                status: 'published',
+                published_at: toIso(at),
+                links: Object.fromEntries(
+                    channels.map((channel) => [
+                        channel,
+                        (links[channel] ?? '').trim(),
+                    ]),
+                ),
+            },
             {
                 preserveScroll: true,
                 onStart: () => {
@@ -137,25 +157,49 @@ export function PublishDialog({
                         </Popover>
                     </div>
 
-                    <div className="flex flex-col gap-1.5">
-                        <label
-                            htmlFor="publish-url"
-                            className="text-[0.8438rem] font-bold text-secondary-foreground"
-                        >
+                    <fieldset className="flex flex-col gap-2">
+                        <legend className="mb-1.5 text-[0.8438rem] font-bold text-secondary-foreground">
                             Tautan{' '}
                             <span className="text-[0.6875rem] font-semibold text-muted-foreground">
-                                opsional
+                                opsional, satu per channel
                             </span>
-                        </label>
-                        <Input
-                            id="publish-url"
-                            type="url"
-                            inputMode="url"
-                            value={url}
-                            onChange={(event) => setUrl(event.target.value)}
-                            placeholder="https://www.instagram.com/p/…"
-                        />
-                    </div>
+                        </legend>
+                        {channels.map((channel) => (
+                            <label
+                                key={channel}
+                                className="flex items-center gap-2.5"
+                            >
+                                <span
+                                    className="grid w-4 shrink-0 place-items-center"
+                                    title={CHANNEL_LABELS[channel]}
+                                >
+                                    <ChannelIcon
+                                        channel={channel}
+                                        className={cn(
+                                            'size-3.5',
+                                            CHANNEL_TONE[channel].text,
+                                        )}
+                                    />
+                                </span>
+                                <span className="sr-only">
+                                    Tautan {CHANNEL_LABELS[channel]}
+                                </span>
+                                <Input
+                                    type="url"
+                                    inputMode="url"
+                                    value={links[channel] ?? ''}
+                                    onChange={(event) =>
+                                        setLinks((current) => ({
+                                            ...current,
+                                            [channel]: event.target.value,
+                                        }))
+                                    }
+                                    placeholder={`Tautan ${CHANNEL_LABELS[channel]}`}
+                                    className="text-[0.8438rem]"
+                                />
+                            </label>
+                        ))}
+                    </fieldset>
 
                     {failed ? (
                         <p className="flex items-center gap-1.5 text-xs font-semibold text-destructive">

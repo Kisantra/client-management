@@ -2,7 +2,7 @@
 
 namespace App\Support;
 
-use App\Models\Content;
+use App\Models\ContentLink;
 use App\Models\InstagramPost;
 use App\Models\TiktokPost;
 use Carbon\CarbonInterface;
@@ -39,11 +39,7 @@ class ReleasedPosts
     {
         /* Which addresses a piece already points at, so the picker can say so
            rather than let two pieces quietly claim one post. */
-        $taken = Content::query()
-            ->whereNotNull('url')
-            ->where('url', '!=', '')
-            ->pluck('url')
-            ->flip();
+        $taken = ContentLink::query()->pluck('url')->flip();
 
         $instagram = InstagramPost::query()
             ->whereNotNull('url')

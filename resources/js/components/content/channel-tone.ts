@@ -35,6 +35,18 @@ export const CHANNEL_TONE: Record<
             'border border-channel-tiktok-foreground/35 bg-card text-channel-tiktok-foreground',
         text: 'text-channel-tiktok-foreground',
     },
+    /*
+     | Violet, not red. YouTube's own hue is the one colour this palette has
+     | already spent: red marks a piece that is past its date, and a red chip on
+     | a calendar card would sit on top of that signal. The mark carries the
+     | recognition instead, which is what the whole icon family is for.
+     */
+    youtube: {
+        filled: 'bg-channel-youtube text-channel-youtube-foreground',
+        outlined:
+            'border border-channel-youtube-foreground/35 bg-card text-channel-youtube-foreground',
+        text: 'text-channel-youtube-foreground',
+    },
     linkedin: {
         filled: 'bg-channel-linkedin text-channel-linkedin-foreground',
         outlined:

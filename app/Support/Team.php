@@ -7,6 +7,7 @@ use App\Models\Lead;
 use App\Models\User;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Support\Collection;
+use Illuminate\Support\Facades\DB;
 
 /**
  * Who may be put down as PJ.
@@ -23,6 +24,9 @@ use Illuminate\Support\Collection;
  */
 class Team
 {
+    /** The tables that sign a record with the name of whoever wrote it. */
+    private const SIGNED = ['lead_notes', 'content_status_events', 'content_ideas', 'content_comments'];
+
     /**
      * @return array<int, array{name: string, hasAccount: bool, active: int}>
      */
@@ -51,6 +55,69 @@ class Team
             ->sortBy([['hasAccount', 'desc'], ['name', 'asc']])
             ->values()
             ->all();
+    }
+
+    /** Every name the roster holds: accounts, and every PJ the work carries. @return array<int, string> */
+    public static function roster(): array
+    {
+        return self::names(User::query()->pluck('name'))->all();
+    }
+
+    /**
+     * How much of the work is written down under a name.
+     *
+     * @return array{content: int, leads: int}
+     */
+    public static function holdings(string $name): array
+    {
+        return [
+            'content' => Content::query()->where('owner', $name)->count(),
+            'leads' => Lead::query()->where('owner', $name)->count(),
+        ];
+    }
+
+    /**
+     * A new name, everywhere the old one was written.
+     *
+     * The app ties a person to their work by the exact name, so a rename that
+     * touched only the account would quietly orphan everything they hold —
+     * and every note they wrote would go on being signed by somebody who, as
+     * far as the app can tell, no longer exists.
+     *
+     * @return array{content: int, leads: int}
+     */
+    public static function rename(string $from, string $to): array
+    {
+        if ($from === $to) {
+            return ['content' => 0, 'leads' => 0];
+        }
+
+        return DB::transaction(function () use ($from, $to) {
+            foreach (self::SIGNED as $table) {
+                DB::table($table)->where('author', $from)->update(['author' => $to]);
+            }
+
+            return [
+                'content' => DB::table('contents')->where('owner', $from)->update(['owner' => $to]),
+                'leads' => DB::table('leads')->where('owner', $from)->update(['owner' => $to]),
+            ];
+        });
+    }
+
+    /**
+     * Everything a name is PJ for, given to somebody else or to nobody.
+     *
+     * Authorship is left alone on purpose. Who is responsible for a piece
+     * can change hands; who wrote a note on it cannot.
+     *
+     * @return array{content: int, leads: int}
+     */
+    public static function handOver(string $from, ?string $to): array
+    {
+        return DB::transaction(fn () => [
+            'content' => DB::table('contents')->where('owner', $from)->update(['owner' => $to]),
+            'leads' => DB::table('leads')->where('owner', $from)->update(['owner' => $to]),
+        ]);
     }
 
     /**

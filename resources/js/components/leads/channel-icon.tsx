@@ -48,6 +48,25 @@ export function ChannelIcon({
         );
     }
 
+    if (channel === 'youtube') {
+        return (
+            <svg
+                viewBox="0 0 24 24"
+                fill="currentColor"
+                className={shared}
+                aria-hidden
+            >
+                {/* The play triangle is a hole rather than a second fill, so
+                    the mark holds its shape at 12px the way the others do. */}
+                <path
+                    fillRule="evenodd"
+                    clipRule="evenodd"
+                    d="M21.6 7.3a2.72 2.72 0 0 0-1.92-1.93C17.98 4.9 12 4.9 12 4.9s-5.98 0-7.68.47A2.72 2.72 0 0 0 2.4 7.3C2 9.03 2 12 2 12s0 2.97.4 4.7a2.72 2.72 0 0 0 1.92 1.93c1.7.47 7.68.47 7.68.47s5.98 0 7.68-.47a2.72 2.72 0 0 0 1.92-1.93c.4-1.73.4-4.7.4-4.7s0-2.97-.4-4.7ZM10.05 15.3V8.7L15.77 12l-5.72 3.3Z"
+                />
+            </svg>
+        );
+    }
+
     if (channel === 'linkedin') {
         return (
             <svg

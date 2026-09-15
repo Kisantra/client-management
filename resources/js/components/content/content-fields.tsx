@@ -1,6 +1,6 @@
 import { usePage } from '@inertiajs/react';
 import { Check, ExternalLink, Trash2 } from 'lucide-react';
-import { useState } from 'react';
+import { useRef, useState } from 'react';
 import { CHANNEL_TONE } from '@/components/content/channel-tone';
 import {
     FieldChevron,
@@ -585,29 +585,79 @@ export function ReferenceField({ content }: { content: ContentDetail }) {
     );
 }
 
+/** The platforms Performa scrapes, and so the ones it can offer posts for. */
+const SCRAPED: ChannelKey[] = ['instagram', 'tiktok'];
+
+/** What an address on each channel looks like, as a hint in the empty box. */
+const PLACEHOLDER: Partial<Record<ChannelKey, string>> = {
+    instagram: 'https://www.instagram.com/p/…',
+    tiktok: 'https://www.tiktok.com/@…/video/…',
+    youtube: 'https://www.youtube.com/watch?v=…',
+    facebook: 'https://www.facebook.com/…',
+    twitter: 'https://x.com/…/status/…',
+    linkedin: 'https://www.linkedin.com/posts/…',
+};
+
 /**
- * Where the piece went live.
+ * Where the piece went live — once for every channel it went out on.
  *
- * Every address this field wants is in the app already — Performa pulls each
- * post the moment it goes out — so the list comes first and the box underneath
- * is the way in for everything Performa does not follow.
+ * The same cut posted to Instagram and TikTok is one piece of work with two
+ * addresses, and each leads to a different set of figures. A single link box
+ * made somebody choose which one to keep; now each channel has its own line,
+ * marked with its own mark, and taking one back leaves the other alone.
+ *
+ * A link filed under a channel the piece no longer lists is still shown at the
+ * end rather than silently hidden: it was recorded, and it can be removed.
  */
 export function LinkField({ content }: { content: ContentDetail }) {
+    const linked = Object.keys(content.links) as ChannelKey[];
+    const shown = [
+        ...content.channels,
+        ...linked.filter((channel) => !content.channels.includes(channel)),
+    ];
+
     return (
-        <AddressField
-            content={content}
-            field="url"
-            heading="Tautan"
-            value={content.url}
-            placeholder="https://www.instagram.com/p/…"
-            released
-        />
+        <span className="flex w-full min-w-0 flex-col gap-1">
+            {shown.map((channel) => (
+                <span
+                    key={channel}
+                    className="flex w-full min-w-0 items-start gap-2"
+                >
+                    {/* The mark stands in for the channel's name: the panel
+                        already says "Channel" two lines up, in words. */}
+                    <span
+                        className="grid h-7 w-4 shrink-0 place-items-center"
+                        title={CHANNEL_LABELS[channel]}
+                    >
+                        <ChannelIcon
+                            channel={channel}
+                            className={cn(
+                                'size-3.5',
+                                CHANNEL_TONE[channel].text,
+                            )}
+                        />
+                    </span>
+                    <span className="min-w-0 flex-1">
+                        <AddressField
+                            content={content}
+                            field="link"
+                            channel={channel}
+                            heading={`Tautan ${CHANNEL_LABELS[channel]}`}
+                            value={content.links[channel] ?? null}
+                            placeholder={PLACEHOLDER[channel] ?? 'https://…'}
+                            released={SCRAPED.includes(channel)}
+                        />
+                    </span>
+                </span>
+            ))}
+        </span>
     );
 }
 
 function AddressField({
     content,
     field,
+    channel,
     heading,
     value,
     placeholder,
@@ -615,6 +665,8 @@ function AddressField({
 }: {
     content: ContentDetail;
     field: string;
+    /** Set for a piece's per-channel link, whose write names its channel. */
+    channel?: ChannelKey;
     heading: string;
     value: string | null;
     placeholder: string;
@@ -627,14 +679,35 @@ function AddressField({
     const [open, setOpen] = useState(false);
     const [draft, setDraft] = useState(value ?? '');
 
+    /*
+     | The panel this field sits in is modal, and a modal panel locks scrolling
+     | everywhere outside its own subtree. A popover portalled to the body is
+     | outside it, so the list of released posts would render with a scrollbar
+     | and then refuse the wheel. Found from the trigger rather than queried
+     | globally: the field does not need to know it is in a panel, only which
+     | one it is in — and in a dialog, or nothing, this is simply null.
+     */
+    const trigger = useRef<HTMLButtonElement>(null);
+    const [within, setWithin] = useState<HTMLElement | null>(null);
+
     const start = (next: boolean) => {
         if (next) {
             setDraft(value ?? '');
             forget();
+            setWithin(
+                trigger.current?.closest<HTMLElement>(
+                    '[data-slot="sheet-content"], [data-slot="dialog-content"]',
+                ) ?? null,
+            );
         }
 
         setOpen(next);
     };
+
+    /* One write for every way out of the popover: a picked post, a typed
+       address, or a cleared one. A per-channel link names its channel. */
+    const commit = (url: string) =>
+        save(field, channel ? { channel, url } : url, () => setOpen(false));
 
     return (
         <FieldStack>
@@ -646,6 +719,7 @@ function AddressField({
                 <Popover open={open} onOpenChange={start}>
                     <PopoverTrigger asChild>
                         <button
+                            ref={trigger}
                             type="button"
                             disabled={saving}
                             onAnimationEnd={settled}
@@ -668,14 +742,14 @@ function AddressField({
                     <PopoverContent
                         align="start"
                         collisionPadding={12}
+                        container={within}
                         className="flex max-h-(--radix-popover-content-available-height) w-[min(24rem,calc(100vw-2rem))] flex-col p-0"
                     >
                         {released ? (
                             <ReleasedList
                                 value={draft}
-                                onPick={(url) =>
-                                    save(field, url, () => setOpen(false))
-                                }
+                                channel={channel}
+                                onPick={commit}
                             />
                         ) : null}
 
@@ -690,9 +764,7 @@ function AddressField({
                                 onKeyDown={(event) => {
                                     if (event.key === 'Enter') {
                                         event.preventDefault();
-                                        save(field, draft, () =>
-                                            setOpen(false),
-                                        );
+                                        commit(draft);
                                     }
                                 }}
                                 placeholder={placeholder}
@@ -704,15 +776,8 @@ function AddressField({
                         <Footer
                             saving={saving}
                             onCancel={() => setOpen(false)}
-                            onSave={() =>
-                                save(field, draft, () => setOpen(false))
-                            }
-                            onClear={
-                                value
-                                    ? () =>
-                                          save(field, '', () => setOpen(false))
-                                    : undefined
-                            }
+                            onSave={() => commit(draft)}
+                            onClear={value ? () => commit('') : undefined}
                         />
                     </PopoverContent>
                 </Popover>

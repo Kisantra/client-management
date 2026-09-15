@@ -47,4 +47,21 @@ class Dates
     {
         return $date->day.' '.self::MONTHS[$date->month - 1].' '.$date->year;
     }
+
+    /** "Agustus", for headings with room for the whole word. */
+    public static function monthName(int $month): string
+    {
+        return self::FULL_MONTHS[$month - 1] ?? '';
+    }
+
+    /** "Agu", for axis labels and anywhere a column is narrow. */
+    public static function shortMonthName(int $month): string
+    {
+        return self::MONTHS[$month - 1] ?? '';
+    }
+
+    private const FULL_MONTHS = [
+        'Januari', 'Februari', 'Maret', 'April', 'Mei', 'Juni',
+        'Juli', 'Agustus', 'September', 'Oktober', 'November', 'Desember',
+    ];
 }

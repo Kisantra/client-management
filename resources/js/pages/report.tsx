@@ -1,5 +1,31 @@
 import { Head, router } from '@inertiajs/react';
-import { ChevronLeft, ChevronRight, Download, Printer } from 'lucide-react';
+import {
+    ChevronDown,
+    ChevronLeft,
+    ChevronRight,
+    Download,
+    FileSpreadsheet,
+    Printer,
+    Users,
+} from 'lucide-react';
+import type { LucideIcon } from 'lucide-react';
+import { StatTile } from '@/components/dashboard/stat-tile';
+import { MiniBars, MiniLine } from '@/components/dashboard/stat-viz';
+import { ContentPatterns } from '@/components/report/content-patterns';
+import type { PatternsData } from '@/components/report/content-patterns';
+import { ContentProduction } from '@/components/report/content-production';
+import { LeadSources } from '@/components/report/lead-sources';
+import type { LeadSource } from '@/components/report/lead-sources';
+import { nf } from '@/components/report/report-section';
+import { TopContent } from '@/components/report/top-content';
+import type { TopContentData } from '@/components/report/top-content';
+import {
+    DropdownMenu,
+    DropdownMenuContent,
+    DropdownMenuItem,
+    DropdownMenuSeparator,
+    DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu';
 import { cn } from '@/lib/utils';
 import { report as reportIndex } from '@/routes';
 import { exportMethod as reportExport } from '@/routes/report';
@@ -21,6 +47,8 @@ type Figure = {
     /** The same figure over the period immediately before this one. */
     was: number;
     note: string;
+    /** The six periods ending in this one, oldest first, for the chart. */
+    series: number[];
 };
 
 type ChannelRow = {
@@ -43,36 +71,11 @@ type Props = {
         published: number;
         late: number;
     }[];
-    sources: {
-        key: string;
-        label: string;
-        leads: number;
-        value: number;
-        clients: number;
-    }[];
-    earning: {
-        title: string;
-        channels: string[];
-        leads: number;
-        clients: number;
-    }[];
+    sources: LeadSource[];
+    top: TopContentData;
+    patterns: PatternsData;
     generatedAt: string;
 };
-
-const nf = new Intl.NumberFormat('id-ID');
-
-/** Rupiah at report scale: 47.500.000 reads as 47,5 jt. */
-function money(value: number): string {
-    if (value === 0) {
-        return '—';
-    }
-
-    if (value >= 1_000_000_000) {
-        return `Rp ${nf.format(Math.round((value / 1_000_000_000) * 10) / 10)} M`;
-    }
-
-    return `Rp ${nf.format(Math.round(value / 1_000_000))} jt`;
-}
 
 /**
  * The month, or the week, written up.
@@ -94,7 +97,8 @@ export default function ReportPage({
     channels,
     owners,
     sources,
-    earning,
+    top,
+    patterns,
     generatedAt,
 }: Props) {
     const go = (next: { periode?: string; pada?: string }) =>
@@ -124,15 +128,22 @@ export default function ReportPage({
                     /* The rail, the app's own header bar, and every control on
                        this page. Nobody needs a search box in a PDF. */
                     [data-slot="sidebar"],
+                    [data-slot="dropdown-menu-content"],
                     [data-print="hide"] { display: none !important; }
-                    [data-print="sheet"] { padding: 0 !important; }
+                    [data-print="sheet"] {
+                        padding: 0 !important;
+                        /* The lead tile is white on teal; a browser that drops
+                           backgrounds to save ink would print it blank. */
+                        -webkit-print-color-adjust: exact;
+                        print-color-adjust: exact;
+                    }
                     main, [data-slot="sidebar-inset"] {
                         margin: 0 !important;
                         box-shadow: none !important;
                         border: 0 !important;
                     }
                     table { break-inside: auto; }
-                    tr, section { break-inside: avoid; }
+                    tr, section, article { break-inside: avoid; }
                     thead { display: table-header-group; }
                 }
             `}</style>
@@ -225,248 +236,233 @@ export default function ReportPage({
                             </button>
                         </div>
 
-                        {(['konten', 'lead'] as const).map((part) => (
-                            <a
-                                key={part}
-                                href={reportExport.url(part, {
-                                    query: {
-                                        periode: period.kind,
-                                        pada: period.start,
-                                    },
-                                })}
-                                className="inline-flex items-center gap-1.5 rounded-md border border-border bg-card px-3 py-2 text-[0.8438rem] font-bold text-secondary-foreground shadow-lift transition-colors hover:border-primary/35 hover:text-primary-deep"
-                            >
-                                <Download
-                                    className="size-4"
-                                    strokeWidth={2}
-                                    aria-hidden
-                                />
-                                CSV {part}
-                            </a>
-                        ))}
-
-                        <button
-                            type="button"
-                            onClick={() => window.print()}
-                            className="inline-flex items-center gap-1.5 rounded-md bg-primary px-3 py-2 text-[0.8438rem] font-bold text-primary-foreground shadow-teal transition-colors hover:bg-primary-deep"
-                        >
-                            <Printer
-                                className="size-4"
-                                strokeWidth={2}
-                                aria-hidden
-                            />
-                            Cetak / PDF
-                        </button>
+                        <ExportMenu period={period} />
                     </div>
                 </div>
 
-                <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
-                    {summary.map((figure) => (
-                        <Stat key={figure.key} figure={figure} />
+                {/* The dashboard's own tiles, so the two pages read as one
+                    product: the lead figure anchored in teal, every figure
+                    with its recent shape beside it. No link on any of them —
+                    this page is already the detail. */}
+                <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 sm:gap-4 xl:grid-cols-4">
+                    {summary.map((figure, at) => (
+                        <ReportTile
+                            key={figure.key}
+                            figure={figure}
+                            /* A week's full name fills the tile's whole
+                               footer; the subtitle above already spells it
+                               out, so the tile only needs to point at it. */
+                            previous={
+                                period.kind === 'minggu'
+                                    ? 'minggu sebelumnya'
+                                    : previous.label
+                            }
+                            anchor={at === 0}
+                            delay={at * 90}
+                        />
                     ))}
                 </div>
 
-                <div className="grid gap-5 xl:grid-cols-2">
-                    <Table
-                        title="Konten per channel"
-                        note="Satu konten di dua channel dihitung di keduanya: dibuat sekali, tayang dua kali."
-                        head={['Channel', 'Dijadwalkan', 'Tayang', 'Telat']}
-                        rows={channels.map((row) => [
-                            row.label,
-                            nf.format(row.planned),
-                            nf.format(row.published),
-                            row.late > 0 ? nf.format(row.late) : '—',
-                        ])}
-                        alarm={channels.map((row) => row.late > 0)}
-                    />
-
-                    <Table
-                        title="Konten per penanggung jawab"
-                        note="Dihitung dari tanggal tayang yang dijadwalkan pada periode ini."
-                        head={['Nama', 'Dijadwalkan', 'Tayang', 'Telat']}
-                        rows={owners.map((row) => [
-                            row.name,
-                            nf.format(row.planned),
-                            nf.format(row.published),
-                            row.late > 0 ? nf.format(row.late) : '—',
-                        ])}
-                        alarm={owners.map((row) => row.late > 0)}
-                    />
-
-                    <Table
-                        title="Lead per channel"
-                        note="Lead yang masuk pada periode ini. “Kini client” dihitung per hari ini, bukan per periode — beda dari kartu Jadi client di atas."
-                        head={['Channel', 'Lead', 'Estimasi', 'Kini client']}
-                        rows={sources.map((row) => [
-                            row.label,
-                            nf.format(row.leads),
-                            money(row.value),
-                            row.clients > 0 ? nf.format(row.clients) : '—',
-                        ])}
-                    />
-
-                    {/* The one table that answers what the whole app is built
-                        around, and it is read from the lead's own content_id
-                        rather than guessed at. */}
-                    <Table
-                        title="Konten yang menghasilkan lead"
-                        note="Ditautkan dari lead-nya sendiri, bukan dugaan. Hitungannya sama dengan tabel di sebelah."
-                        head={['Konten', 'Lead', 'Kini client']}
-                        rows={earning.map((row) => [
-                            row.title,
-                            nf.format(row.leads),
-                            row.clients > 0 ? nf.format(row.clients) : '—',
-                        ])}
-                        empty="Belum ada lead pada periode ini yang tertaut ke konten."
-                    />
+                {/* Lead on the left, content on the right: the same halves
+                    the tiles above are split into, so each card sits under
+                    the figures it explains. */}
+                <div className="grid gap-4 xl:grid-cols-2">
+                    <LeadSources sources={sources} />
+                    <ContentProduction channels={channels} owners={owners} />
                 </div>
+
+                <TopContent top={top} periodLabel={period.label} />
+
+                <ContentPatterns data={patterns} />
             </div>
         </>
     );
 }
 
-/** One headline figure, and the same figure last time. */
-function Stat({ figure }: { figure: Figure }) {
+/**
+ * Every way out of the page, behind one button.
+ *
+ * Three side-by-side buttons made the toolbar wider than the controls that
+ * actually change what the page shows. Folded into one menu, each way out
+ * can also say what it hands over — the sheet as printed, or the rows behind
+ * it — which a two-word button label never could.
+ */
+function ExportMenu({ period }: { period: Period }) {
+    const query = { query: { periode: period.kind, pada: period.start } };
+
+    return (
+        <DropdownMenu modal={false}>
+            <DropdownMenuTrigger asChild>
+                <button
+                    type="button"
+                    className="group/export inline-flex items-center gap-1.5 rounded-md bg-primary py-2 pr-2.5 pl-3 text-[0.8438rem] font-bold text-primary-foreground shadow-teal transition-colors hover:bg-primary-deep focus-visible:ring-2 focus-visible:ring-primary/40 focus-visible:ring-offset-2 focus-visible:outline-none data-[state=open]:bg-primary-deep"
+                >
+                    <Download className="size-4" strokeWidth={2} aria-hidden />
+                    Ekspor
+                    <ChevronDown
+                        className="size-4 opacity-80 transition-transform duration-200 group-data-[state=open]/export:rotate-180"
+                        strokeWidth={2.25}
+                        aria-hidden
+                    />
+                </button>
+            </DropdownMenuTrigger>
+
+            <DropdownMenuContent
+                align="end"
+                sideOffset={6}
+                className="w-[17.5rem] rounded-lg border-border p-1.5 shadow-lift-lg"
+            >
+                <p className="px-2 pt-1 pb-1.5 text-[0.6875rem] font-bold tracking-[0.1em] text-muted-foreground uppercase">
+                    Laporan {period.label}
+                </p>
+
+                <ExportItem
+                    icon={Printer}
+                    title="Cetak atau simpan PDF"
+                    body="Halaman ini, siap dicetak."
+                    /* Printing blocks the page. Waiting out the menu's closing
+                       fade keeps it from being frozen, half-faded, on the
+                       screen behind the print dialog. */
+                    onSelect={() =>
+                        window.setTimeout(() => window.print(), 160)
+                    }
+                />
+
+                <DropdownMenuSeparator className="mx-1 my-1.5" />
+
+                <p className="px-2 pt-0.5 pb-1.5 text-[0.6875rem] font-bold tracking-[0.1em] text-muted-foreground uppercase">
+                    Data mentah · CSV
+                </p>
+
+                <ExportItem
+                    icon={FileSpreadsheet}
+                    title="Data konten"
+                    body="Konten terjadwal di periode ini."
+                    href={reportExport.url('konten', query)}
+                />
+                <ExportItem
+                    icon={Users}
+                    title="Data lead"
+                    body="Lead yang masuk di periode ini."
+                    href={reportExport.url('lead', query)}
+                />
+            </DropdownMenuContent>
+        </DropdownMenu>
+    );
+}
+
+function ExportItem({
+    icon: Icon,
+    title,
+    body,
+    href,
+    onSelect,
+}: {
+    icon: LucideIcon;
+    title: string;
+    body: string;
+    href?: string;
+    onSelect?: () => void;
+}) {
+    const inner = (
+        <>
+            <span className="grid size-8 shrink-0 place-items-center rounded-md bg-primary-soft text-primary-deep transition-colors group-data-[highlighted]/item:bg-primary group-data-[highlighted]/item:text-primary-foreground">
+                {/* text-current, or the menu item paints every icon grey. */}
+                <Icon
+                    className="size-4 text-current"
+                    strokeWidth={2}
+                    aria-hidden
+                />
+            </span>
+            <span className="min-w-0">
+                <span className="block text-[0.8438rem] leading-tight font-bold text-foreground">
+                    {title}
+                </span>
+                <span className="mt-0.5 block text-xs leading-snug text-muted-foreground">
+                    {body}
+                </span>
+            </span>
+        </>
+    );
+
+    const className =
+        'group/item cursor-pointer items-start gap-2.5 rounded-md px-2 py-2 data-[highlighted]:bg-neutral-soft';
+
+    /* The CSV answers with an attachment, so a plain link downloads it without
+       leaving the page — and stays a link a person can copy or open elsewhere. */
+    return href ? (
+        <DropdownMenuItem asChild className={className}>
+            <a href={href}>{inner}</a>
+        </DropdownMenuItem>
+    ) : (
+        <DropdownMenuItem className={className} onSelect={onSelect}>
+            {inner}
+        </DropdownMenuItem>
+    );
+}
+
+/**
+ * One headline figure, as the dashboard draws it: the count, the same count
+ * last period as a change, and the last six periods as its shape.
+ */
+function ReportTile({
+    figure,
+    previous,
+    anchor,
+    delay,
+}: {
+    figure: Figure;
+    previous: string;
+    anchor: boolean;
+    delay: number;
+}) {
     const delta = figure.value - figure.was;
 
     /* Fewer late pieces is the good direction; for everything else it is more.
        A report that colours every fall red would be lying about half of it. */
     const better = figure.key === 'late' ? delta < 0 : delta > 0;
+    const shape = `${figure.label} enam periode terakhir, kini ${nf.format(figure.value)}`;
 
     return (
-        <section className="rounded-xl border border-border bg-card p-4 shadow-lift">
-            <p className="text-[0.8438rem] font-bold text-secondary-foreground">
-                {figure.label}
-            </p>
-            <p
-                className="mt-1.5 text-3xl leading-none font-extrabold tracking-[-0.03em]"
-                data-numeric
-            >
-                {nf.format(figure.value)}
-            </p>
-            <p className="mt-2 flex flex-wrap items-baseline gap-x-1.5 text-xs">
-                {delta === 0 ? (
-                    <span className="text-muted-foreground">
-                        Sama dengan periode sebelumnya
-                    </span>
+        <StatTile
+            tone={anchor ? 'anchor' : 'plain'}
+            label={figure.label}
+            hint={`${figure.label}: ${figure.note}.`}
+            value={figure.value}
+            format={(value) => nf.format(value)}
+            delay={delay}
+            compare={delta === 0 ? `sama dengan ${previous}` : `vs ${previous}`}
+            delta={
+                delta === 0
+                    ? undefined
+                    : {
+                          text: `${delta > 0 ? '+' : '−'}${nf.format(Math.abs(delta))}`,
+                          direction: better ? 'up' : 'down',
+                      }
+            }
+            viz={
+                figure.key === 'clients' ? (
+                    <MiniLine
+                        values={figure.series}
+                        strokeClassName="stroke-primary text-primary"
+                        fillClassName="fill-primary/12"
+                        label={shape}
+                    />
                 ) : (
-                    <>
-                        <span
-                            className={cn(
-                                'font-bold',
-                                better
-                                    ? 'text-primary-deep'
-                                    : 'text-destructive',
-                            )}
-                            data-numeric
-                        >
-                            {delta > 0 ? '+' : '−'}
-                            {nf.format(Math.abs(delta))}
-                        </span>
-                        <span className="text-muted-foreground">
-                            dari{' '}
-                            <span data-numeric>{nf.format(figure.was)}</span>
-                        </span>
-                    </>
-                )}
-            </p>
-            <p className="mt-1 text-[0.6875rem] leading-relaxed text-muted-foreground">
-                {figure.note}
-            </p>
-        </section>
-    );
-}
-
-/**
- * One table, and the sentence that says how to read it.
- *
- * A report table without a note under its title is a table the reader has to
- * guess the rules of — whether a piece on two channels counts twice, whether
- * "jadi client" means within the period or as of today. Guessing is how a
- * figure gets quoted wrongly in a meeting.
- */
-function Table({
-    title,
-    note,
-    head,
-    rows,
-    alarm,
-    empty = 'Tidak ada data pada periode ini.',
-}: {
-    title: string;
-    note: string;
-    head: string[];
-    rows: string[][];
-    /** Which rows carry something late, so the figure reads in the alarm tone. */
-    alarm?: boolean[];
-    empty?: string;
-}) {
-    return (
-        <section className="min-w-0 rounded-xl border border-border bg-card p-4 shadow-lift sm:p-5">
-            <h2 className="text-base font-extrabold tracking-[-0.02em]">
-                {title}
-            </h2>
-            <p className="mt-1 mb-3 text-xs leading-relaxed text-muted-foreground">
-                {note}
-            </p>
-
-            {rows.length === 0 ? (
-                <p className="py-6 text-center text-xs text-muted-foreground">
-                    {empty}
-                </p>
-            ) : (
-                <div className="-mx-1 overflow-x-auto px-1">
-                    <table className="w-full min-w-0 text-[0.8438rem]">
-                        <thead>
-                            <tr className="border-b border-border">
-                                {head.map((cell, index) => (
-                                    <th
-                                        key={cell}
-                                        scope="col"
-                                        className={cn(
-                                            'pb-2 text-[0.6875rem] font-bold tracking-[0.06em] text-muted-foreground uppercase',
-                                            index === 0
-                                                ? 'text-left'
-                                                : 'text-right',
-                                        )}
-                                    >
-                                        {cell}
-                                    </th>
-                                ))}
-                            </tr>
-                        </thead>
-                        <tbody>
-                            {rows.map((row, rowIndex) => (
-                                <tr
-                                    key={row[0] + rowIndex}
-                                    className="border-b border-border last:border-b-0"
-                                >
-                                    {row.map((cell, index) => (
-                                        <td
-                                            key={index}
-                                            className={cn(
-                                                'py-2.5',
-                                                index === 0
-                                                    ? 'pr-3 font-bold'
-                                                    : 'text-right tabular-nums',
-                                                index === row.length - 1 &&
-                                                    alarm?.[rowIndex] &&
-                                                    'font-bold text-destructive',
-                                            )}
-                                            data-numeric={
-                                                index > 0 ? '' : undefined
-                                            }
-                                        >
-                                            {cell}
-                                        </td>
-                                    ))}
-                                </tr>
-                            ))}
-                        </tbody>
-                    </table>
-                </div>
-            )}
-        </section>
+                    <MiniBars
+                        values={figure.series}
+                        barClassName={
+                            anchor
+                                ? 'bg-white/70'
+                                : figure.key === 'late'
+                                  ? 'bg-destructive'
+                                  : 'bg-primary'
+                        }
+                        label={shape}
+                    />
+                )
+            }
+        />
     );
 }
 

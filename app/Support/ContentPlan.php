@@ -28,6 +28,43 @@ class ContentPlan
         return self::channels()[$channel] ?? $channel;
     }
 
+    /**
+     * Which channel an address belongs to, read from its host.
+     *
+     * A piece goes out on several channels and keeps a link for each, so every
+     * link has to know which one it is. The host answers that for everything
+     * the team actually publishes to; `$among` is the piece's own channels, and
+     * the first of those is the fallback for a link that is none of the below —
+     * the firm's own site, a newsletter, anything.
+     *
+     * @param  array<int, string>  $among
+     */
+    public static function channelForUrl(string $url, array $among = []): string
+    {
+        $host = strtolower((string) parse_url(trim($url), PHP_URL_HOST));
+
+        foreach (self::HOSTS as $needle => $channel) {
+            if ($host !== '' && str_contains($host, $needle)) {
+                return $channel;
+            }
+        }
+
+        return $among[0] ?? 'web';
+    }
+
+    /** Host fragment to channel. Ordered so `youtu.be` is not read as `.be`. */
+    private const HOSTS = [
+        'instagram.com' => 'instagram',
+        'tiktok.com' => 'tiktok',
+        'youtube.com' => 'youtube',
+        'youtu.be' => 'youtube',
+        'facebook.com' => 'facebook',
+        'fb.watch' => 'facebook',
+        'twitter.com' => 'twitter',
+        'x.com' => 'twitter',
+        'linkedin.com' => 'linkedin',
+    ];
+
     /** @return array<string, string> */
     public static function pillars(): array
     {

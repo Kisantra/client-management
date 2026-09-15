@@ -80,7 +80,8 @@ export type SelectedContent = {
     leads: Lead[];
     /** Reviewer notes, newest first; the open ones are the work. */
     comments: ContentComment[];
-    live: LivePost | null;
+    /** One per linked channel Performa follows; empty when there is none. */
+    live: LivePost[];
 };
 
 type Tab = 'riwayat' | 'komentar' | 'lead';
@@ -278,7 +279,20 @@ function Body({
                         before reaching it had the panel telling the story
                         backwards.
                     */}
-                    {live ? <LiveResult live={live} /> : null}
+                    {/* One banner per channel it went live on. The same cut
+                        on Instagram and on TikTok did two different things,
+                        and the two side by side are the comparison worth
+                        having. Stacked edge to edge, borders shared. */}
+                    {live.length > 0 ? (
+                        <div className="mt-5 flex flex-col [&>*+*]:-mt-px">
+                            {live.map((post) => (
+                                <LiveResult
+                                    key={`${post.channel}-${post.href}`}
+                                    live={post}
+                                />
+                            ))}
+                        </div>
+                    ) : null}
 
                     <dl className="mt-6 grid grid-cols-[7.5rem_minmax(0,1fr)] gap-x-4 gap-y-4 text-[0.8438rem] sm:grid-cols-[9.5rem_minmax(0,1fr)]">
                         {/* The one line on the record that is also a control:
@@ -466,7 +480,8 @@ function Body({
                 onOpenChange={setPublishOpen}
                 contentId={content.id}
                 title={content.title}
-                url={content.url}
+                channels={content.channels}
+                links={content.links}
             />
 
             <DeleteDialog
@@ -511,7 +526,7 @@ function LiveResult({ live }: { live: LivePost }) {
         <Link
             href={live.href}
             title="Lihat di Performa"
-            className="group/banner relative isolate -mx-5 mt-5 flex h-32 items-end overflow-hidden border-y border-border sm:-mx-7"
+            className="group/banner relative isolate -mx-5 flex h-32 items-end overflow-hidden border-y border-border sm:-mx-7"
         >
             {live.thumb ? (
                 <img

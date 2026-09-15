@@ -19,10 +19,21 @@ function PopoverContent({
     className,
     align = 'center',
     sideOffset = 4,
+    container,
     ...props
-}: React.ComponentProps<typeof PopoverPrimitive.Content>) {
+}: React.ComponentProps<typeof PopoverPrimitive.Content> & {
+    /**
+     * Where the portal lands. The body, by default.
+     *
+     * A modal panel locks scrolling everywhere outside its own subtree, and a
+     * popover portalled to the body is outside it — so a list inside one
+     * renders, shows a scrollbar, and then ignores the wheel. Popovers that
+     * carry something scrollable pass the panel here instead.
+     */
+    container?: Element | DocumentFragment | null;
+}) {
     return (
-        <PopoverPrimitive.Portal>
+        <PopoverPrimitive.Portal container={container ?? undefined}>
             <PopoverPrimitive.Content
                 data-slot="popover-content"
                 align={align}

@@ -122,7 +122,12 @@ export function ContentForm({
         content?.publishedAt ? asDate(content.publishedAt) : undefined,
     );
     const [owner, setOwner] = useState(content?.owner ?? '');
-    const [url, setUrl] = useState(content?.url ?? '');
+    /* One address per channel. Kept for a channel that gets unticked while
+       the form is open, so ticking it back does not lose what was typed; only
+       the ticked channels are sent. */
+    const [links, setLinks] = useState<Partial<Record<ChannelKey, string>>>(
+        content?.links ?? {},
+    );
 
     const [dateOpen, setDateOpen] = useState(false);
     const [publishedOpen, setPublishedOpen] = useState(false);
@@ -170,8 +175,13 @@ export function ContentForm({
             next.type = 'Pilih jenis kontennya.';
         }
 
-        if (url && !/^https?:\/\/\S+$/.test(url.trim())) {
-            next.url = 'Tautan harus berupa alamat lengkap, diawali https://.';
+        for (const channel of channels) {
+            const address = (links[channel] ?? '').trim();
+
+            if (address && !/^https?:\/\/\S+$/.test(address)) {
+                next[`links.${channel}`] =
+                    'Tautan harus berupa alamat lengkap, diawali https://.';
+            }
         }
 
         if (referenceUrl && !/^https?:\/\/\S+$/.test(referenceUrl.trim())) {
@@ -207,7 +217,12 @@ export function ContentForm({
                 brief: brief.trim(),
                 caption: caption.trim(),
                 reference_url: referenceUrl.trim(),
-                url: url.trim(),
+                links: Object.fromEntries(
+                    channels.map((channel) => [
+                        channel,
+                        (links[channel] ?? '').trim(),
+                    ]),
+                ),
                 idea_id: content ? '' : (seed?.ideaId ?? ''),
             },
             {
@@ -597,19 +612,64 @@ export function ContentForm({
                 </Field>
 
                 <Field
-                    id="url"
+                    id={`url-${channels[0] ?? 'instagram'}`}
                     label="Tautan"
                     optional
-                    error={errors.url}
+                    error={
+                        channels
+                            .map((channel) => errors[`links.${channel}`])
+                            .find(Boolean) ?? undefined
+                    }
                     className="@lg:col-span-2"
-                    hint="Alamat postingan setelah tayang. Pilih dari yang sudah tersimpan di Performa, atau tempel sendiri."
+                    hint="Satu alamat untuk setiap channel tempat konten ini tayang. Instagram dan TikTok bisa dipilih dari Performa."
                 >
-                    <LinkPicker
-                        value={url}
-                        onChange={setUrl}
-                        invalid={Boolean(errors.url)}
-                        describedBy={errors.url ? 'url-error' : 'url-hint'}
-                    />
+                    {channels.length === 0 ? (
+                        <p className="text-xs text-muted-foreground">
+                            Pilih channel dulu; tiap channel mendapat kolom
+                            tautannya sendiri.
+                        </p>
+                    ) : (
+                        <div className="flex flex-col gap-3">
+                            {channels.map((channel) => (
+                                <div
+                                    key={channel}
+                                    className="flex items-start gap-2.5"
+                                >
+                                    {/* The mark names the line: the channels
+                                        were chosen by name just above. */}
+                                    <span
+                                        className="grid h-9 w-4 shrink-0 place-items-center"
+                                        title={CHANNEL_LABELS[channel]}
+                                    >
+                                        <ChannelIcon
+                                            channel={channel}
+                                            className={cn(
+                                                'size-3.5',
+                                                CHANNEL_TONE[channel].text,
+                                            )}
+                                        />
+                                    </span>
+                                    <div className="min-w-0 flex-1">
+                                        <LinkPicker
+                                            id={`url-${channel}`}
+                                            channel={channel}
+                                            value={links[channel] ?? ''}
+                                            onChange={(address) =>
+                                                setLinks((current) => ({
+                                                    ...current,
+                                                    [channel]: address,
+                                                }))
+                                            }
+                                            placeholder={`Tempel tautan ${CHANNEL_LABELS[channel]}`}
+                                            invalid={Boolean(
+                                                errors[`links.${channel}`],
+                                            )}
+                                        />
+                                    </div>
+                                </div>
+                            ))}
+                        </div>
+                    )}
                 </Field>
             </div>
         </form>

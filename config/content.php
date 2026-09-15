@@ -27,6 +27,7 @@ return [
         'twitter' => 'Twitter',
         'linkedin' => 'LinkedIn',
         'tiktok' => 'TikTok',
+        'youtube' => 'YouTube',
         'web' => 'Web/SEO',
     ],
 

@@ -250,7 +250,22 @@ class ContentSeeder extends Seeder
      */
     private function persist(array $attributes): void
     {
+        /* An address marks a piece that went live. It is kept per channel now,
+           so a piece spread across Instagram and TikTok gets one of each —
+           which is the whole case the link table exists for. */
+        $live = ($attributes['url'] ?? null) !== null;
+        unset($attributes['url']);
+
         $content = Content::create($attributes);
+
+        if ($live) {
+            foreach ($content->channels ?? [] as $channel) {
+                $content->links()->create([
+                    'channel' => $channel,
+                    'url' => $this->url($channel, $content->title),
+                ]);
+            }
+        }
 
         /*
          | The history behind the status: one event per step up to the current

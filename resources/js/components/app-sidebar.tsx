@@ -6,7 +6,6 @@ import {
     LayoutGrid,
     FileText,
     History,
-    ListChecks,
     Settings,
     Users,
     UsersRound,
@@ -20,7 +19,6 @@ import {
     SidebarFooter,
     SidebarHeader,
 } from '@/components/ui/sidebar';
-import { navCounts } from '@/data/dashboard';
 import {
     activity,
     clients,
@@ -29,7 +27,6 @@ import {
     leads,
     performance,
     report,
-    tasks,
     team,
 } from '@/routes';
 import {
@@ -41,9 +38,8 @@ import { edit as editProfile } from '@/routes/profile';
 import type { NavGroup, SharedProps } from '@/types';
 
 /**
- * `counts` comes from the server on every page, so the Leads, Client and
- * Konten badges are the real totals; only Task still wears a sample figure
- * from a module that does not exist yet.
+ * `counts` comes from the server on every page, so every badge on the rail
+ * is a real total.
  */
 function buildNav(counts: SharedProps['counts']): NavGroup[] {
     return [
@@ -99,12 +95,6 @@ function buildNav(counts: SharedProps['counts']): NavGroup[] {
         {
             label: 'Tim',
             items: [
-                {
-                    title: 'Task',
-                    href: tasks(),
-                    icon: ListChecks,
-                    badge: navCounts.tasks,
-                },
                 {
                     title: 'Laporan',
                     href: report(),

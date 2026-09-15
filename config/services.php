@@ -86,4 +86,21 @@ return [
         ],
     ],
 
+    /*
+     | DeepSeek writes the reading of the figures in Laporan Performa — the
+     | executive summary, the findings and what to do about them. It never
+     | supplies a number: every figure in that report is computed here and
+     | handed to the model, which may only put them into sentences.
+     |
+     | Without a key the report still renders, in full, minus the prose.
+     */
+    'deepseek' => [
+        'key' => env('DEEPSEEK_API_KEY'),
+        'base' => env('DEEPSEEK_BASE', 'https://api.deepseek.com'),
+        'model' => env('DEEPSEEK_MODEL', 'deepseek-chat'),
+        /* Long enough for a considered answer, short enough that a report
+           download never sits there looking broken. */
+        'timeout' => (int) env('DEEPSEEK_TIMEOUT', 90),
+    ],
+
 ];

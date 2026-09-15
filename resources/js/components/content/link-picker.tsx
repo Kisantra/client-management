@@ -51,73 +51,118 @@ export function LinkPicker({
     onChange,
     invalid,
     describedBy,
+    id = 'url',
+    channel,
+    placeholder = 'atau tempel sendiri: https://www.instagram.com/p/…',
 }: {
     value: string;
     onChange: (url: string) => void;
     invalid: boolean;
     describedBy?: string;
+    /** The typed box's id; a piece on two channels has two of these. */
+    id?: string;
+    /**
+     * The channel this address is for. Narrows the list to that platform's
+     * posts, and hides it for a platform Performa does not follow.
+     */
+    channel?: ChannelKey;
+    placeholder?: string;
 }) {
     const released = usePage().props.released as ReleasedPost[] | undefined;
 
     const [open, setOpen] = useState(false);
 
+    /*
+     | This form is shown inside a panel as often as on a page, and a modal
+     | panel locks scrolling everywhere outside its own subtree. Portalled to
+     | the body, the list below renders with a scrollbar and then refuses the
+     | wheel; portalled into the panel, it scrolls. Null anywhere else, which
+     | means the body, which is correct there.
+     */
+    const trigger = useRef<HTMLButtonElement>(null);
+    const [within, setWithin] = useState<HTMLElement | null>(null);
+
     /* When the field already holds one of the known posts, the field can show
        the post rather than a hundred characters of address. */
     const chosen = released?.find((post) => post.url === value) ?? null;
 
+    /* A YouTube or LinkedIn address has nothing in Performa to be picked
+       from, so its line is only the typed box — offering the Instagram list
+       there would be an invitation to file a post under the wrong channel. */
+    const pickable =
+        !channel || channel === 'instagram' || channel === 'tiktok';
+
     return (
         <div className="flex flex-col gap-2">
-            <Popover open={open} onOpenChange={setOpen}>
-                <PopoverTrigger asChild>
-                    <button
-                        type="button"
-                        className={cn(
-                            'flex w-full items-center gap-2.5 rounded-md border bg-transparent px-3 py-2 text-left text-sm shadow-xs transition-colors',
-                            invalid
-                                ? 'border-destructive'
-                                : 'border-input hover:border-primary/40',
-                        )}
-                    >
-                        {chosen ? (
-                            <Preview post={chosen} />
-                        ) : value ? (
-                            <span className="min-w-0 flex-1 truncate text-foreground">
-                                {value}
-                            </span>
-                        ) : (
-                            <span className="min-w-0 flex-1 text-muted-foreground">
-                                Pilih dari konten yang sudah tayang…
-                            </span>
-                        )}
+            {pickable ? (
+                <Popover
+                    open={open}
+                    onOpenChange={(next) => {
+                        if (next) {
+                            setWithin(
+                                trigger.current?.closest<HTMLElement>(
+                                    '[data-slot="sheet-content"], [data-slot="dialog-content"]',
+                                ) ?? null,
+                            );
+                        }
 
-                        <ChevronDown
-                            className="size-4 shrink-0 text-muted-foreground"
-                            strokeWidth={2}
-                            aria-hidden
-                        />
-                    </button>
-                </PopoverTrigger>
+                        setOpen(next);
+                    }}
+                >
+                    <PopoverTrigger asChild>
+                        <button
+                            ref={trigger}
+                            type="button"
+                            className={cn(
+                                'flex w-full items-center gap-2.5 rounded-md border bg-transparent px-3 py-2 text-left text-sm shadow-xs transition-colors',
+                                invalid
+                                    ? 'border-destructive'
+                                    : 'border-input hover:border-primary/40',
+                            )}
+                        >
+                            {chosen ? (
+                                <Preview post={chosen} />
+                            ) : value ? (
+                                <span className="min-w-0 flex-1 truncate text-foreground">
+                                    {value}
+                                </span>
+                            ) : (
+                                <span className="min-w-0 flex-1 text-muted-foreground">
+                                    Pilih dari konten yang sudah tayang…
+                                </span>
+                            )}
 
-                {/*
+                            <ChevronDown
+                                className="size-4 shrink-0 text-muted-foreground"
+                                strokeWidth={2}
+                                aria-hidden
+                            />
+                        </button>
+                    </PopoverTrigger>
+
+                    {/*
                     Tautan is the last field on a long form, so the list opens
                     against the bottom of the window as often as not. Bound to
                     the space Radix says is actually there, rather than a fixed
                     height that gets cut off by the edge.
                 */}
-                <PopoverContent
-                    align="start"
-                    collisionPadding={12}
-                    className="flex max-h-(--radix-popover-content-available-height) w-(--radix-popover-trigger-width) flex-col p-0"
-                >
-                    <ReleasedList
-                        value={value}
-                        onPick={(url) => {
-                            onChange(url);
-                            setOpen(false);
-                        }}
-                    />
-                </PopoverContent>
-            </Popover>
+                    <PopoverContent
+                        align="start"
+                        collisionPadding={12}
+                        container={within}
+                        className="flex max-h-(--radix-popover-content-available-height) w-(--radix-popover-trigger-width) flex-col p-0"
+                    >
+                        <ReleasedList
+                            value={value}
+                            channel={channel}
+                            onPick={(url) => {
+                                onChange(url);
+                                setOpen(false);
+                            }}
+                        />
+                    </PopoverContent>
+                </Popover>
+            ) : null}
 
             {/*
                 The address itself, still typed and still cleared by hand. The
@@ -125,12 +170,12 @@ export function LinkPicker({
             */}
             <div className="flex items-center gap-2">
                 <Input
-                    id="url"
+                    id={id}
                     type="url"
                     inputMode="url"
                     value={value}
                     onChange={(event) => onChange(event.target.value)}
-                    placeholder="atau tempel sendiri: https://www.instagram.com/p/…"
+                    placeholder={placeholder}
                     aria-invalid={invalid}
                     aria-describedby={describedBy}
                     className="text-[0.8438rem]"
@@ -181,11 +226,24 @@ export function LinkPicker({
 export function ReleasedList({
     value,
     onPick,
+    channel,
 }: {
     value: string;
     onPick: (url: string) => void;
+    /**
+     * Only this platform's posts. A TikTok slot offered an Instagram post is
+     * an invitation to file a link under the wrong channel.
+     */
+    channel?: ChannelKey;
 }) {
-    const released = usePage().props.released as ReleasedPost[] | undefined;
+    const everything = usePage().props.released as ReleasedPost[] | undefined;
+    const released = useMemo(
+        () =>
+            everything && channel
+                ? everything.filter((post) => post.channel === channel)
+                : everything,
+        [everything, channel],
+    );
     const [query, setQuery] = useState('');
 
     /* A ref, not state: nothing on screen turns on whether the ask has gone
@@ -195,13 +253,13 @@ export function ReleasedList({
     useEffect(() => {
         /* Once per visit to the page: the list changes when Performa syncs,
            not while somebody is deciding. */
-        if (released || asked.current) {
+        if (everything || asked.current) {
             return;
         }
 
         asked.current = true;
         router.reload({ only: ['released'] });
-    }, [released]);
+    }, [everything]);
 
     const matches = useMemo(() => {
         const needle = query.trim().toLowerCase();

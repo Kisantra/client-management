@@ -5,6 +5,7 @@ use App\Models\Content;
 use App\Models\KeyDate;
 use App\Models\Lead;
 use App\Models\User;
+use App\Support\ContentPlan;
 use Illuminate\Support\Carbon;
 
 beforeEach(function () {
@@ -324,14 +325,14 @@ it('records when and where a piece went live, and clears it if pulled back', fun
 
     $this->post(route('content.status.store', $content), [
         'status' => 'published',
-        'url' => 'https://www.instagram.com/p/abc123/',
+        'links' => ['instagram' => 'https://www.instagram.com/p/abc123/'],
     ])->assertRedirect();
 
     $content->refresh();
 
     expect($content->isPublished())->toBeTrue()
         ->and($content->published_at->toDateString())->toBe(Carbon::today()->toDateString())
-        ->and($content->url)->toBe('https://www.instagram.com/p/abc123/');
+        ->and($content->linkMap())->toBe(['instagram' => 'https://www.instagram.com/p/abc123/']);
 
     $this->post(route('content.status.store', $content), ['status' => 'draft'])->assertRedirect();
 
@@ -705,16 +706,16 @@ it('records where a piece went live, and lets that be taken back', function () {
     $content = piece();
 
     $this->post(route('content.field.store', $content), [
-        'field' => 'url',
-        'value' => 'https://www.instagram.com/p/abc123/',
+        'field' => 'link',
+        'value' => ['channel' => 'instagram', 'url' => 'https://www.instagram.com/p/abc123/'],
     ])->assertRedirect();
 
-    expect($content->fresh()->url)->toBe('https://www.instagram.com/p/abc123/');
+    expect($content->fresh()->linkMap())->toBe(['instagram' => 'https://www.instagram.com/p/abc123/']);
 
     $this->post(route('content.field.store', $content), [
-        'field' => 'url',
-        'value' => 'bukan alamat',
-    ])->assertSessionHasErrors('value');
+        'field' => 'link',
+        'value' => ['channel' => 'instagram', 'url' => 'bukan alamat'],
+    ])->assertSessionHasErrors('value.url');
 
     $this->post(route('content.field.store', $content), [
         'field' => 'reference_url',
@@ -723,7 +724,7 @@ it('records where a piece went live, and lets that be taken back', function () {
 
     expect($content->fresh()->reference_url)->toBeNull()
         // The bad address never landed.
-        ->and($content->fresh()->url)->toBe('https://www.instagram.com/p/abc123/');
+        ->and($content->fresh()->linkMap())->toBe(['instagram' => 'https://www.instagram.com/p/abc123/']);
 });
 
 /*
@@ -748,4 +749,81 @@ it('writes a change made from the panel into the activity log', function () {
         ->and($entry->action)->toBe('updated')
         ->and($entry->actor)->toBe('Admin')
         ->and($entry->toRow()['changes'])->toHaveCount(1);
+});
+
+/*
+ | The question that started the link table: the same cut posted to Instagram
+ | and TikTok is one piece of work with two addresses. The single link column
+ | could keep one of them, and the other was simply lost.
+ */
+it('keeps an address for every channel a piece went out on', function () {
+    $content = piece(['channels' => ['instagram', 'tiktok']]);
+
+    $this->post(route('content.field.store', $content), [
+        'field' => 'link',
+        'value' => ['channel' => 'instagram', 'url' => 'https://www.instagram.com/p/IG1/'],
+    ])->assertRedirect();
+
+    $this->post(route('content.field.store', $content), [
+        'field' => 'link',
+        'value' => ['channel' => 'tiktok', 'url' => 'https://www.tiktok.com/@kisantra/video/1'],
+    ])->assertRedirect();
+
+    // Both survive, in the order the channels were ticked.
+    expect($content->fresh()->linkMap())->toBe([
+        'instagram' => 'https://www.instagram.com/p/IG1/',
+        'tiktok' => 'https://www.tiktok.com/@kisantra/video/1',
+    ]);
+
+    // Taking one back leaves the other exactly where it was.
+    $this->post(route('content.field.store', $content), [
+        'field' => 'link',
+        'value' => ['channel' => 'instagram', 'url' => ''],
+    ])->assertRedirect();
+
+    expect($content->fresh()->linkMap())->toBe([
+        'tiktok' => 'https://www.tiktok.com/@kisantra/video/1',
+    ]);
+});
+
+it('makes the form the whole truth about a piece’s links', function () {
+    $content = piece(['channels' => ['instagram', 'tiktok']]);
+    $content->links()->create(['channel' => 'instagram', 'url' => 'https://www.instagram.com/p/OLD/']);
+    $content->links()->create(['channel' => 'tiktok', 'url' => 'https://www.tiktok.com/@kisantra/video/OLD']);
+
+    $this->post(route('content.update', $content), [
+        'title' => $content->title,
+        'channels' => ['instagram', 'tiktok'],
+        'pillar' => 'informasi',
+        'type' => 'carousel',
+        'status' => 'review',
+        'scheduled_for' => $content->scheduled_for->toDateString(),
+        /* A blank means "not published there", so its row goes rather than
+           staying behind holding an empty address. */
+        'links' => ['instagram' => 'https://www.instagram.com/p/NEW/', 'tiktok' => ''],
+    ])->assertRedirect();
+
+    expect($content->fresh()->linkMap())->toBe(['instagram' => 'https://www.instagram.com/p/NEW/']);
+
+    // An address filed under a channel that does not exist is a typo.
+    $this->post(route('content.update', $content), [
+        'title' => $content->title,
+        'channels' => ['instagram'],
+        'pillar' => 'informasi',
+        'type' => 'carousel',
+        'status' => 'review',
+        'scheduled_for' => $content->scheduled_for->toDateString(),
+        'links' => ['myspace' => 'https://myspace.com/x'],
+    ])->assertSessionHasErrors('links');
+});
+
+it('reads which channel an address belongs to from its host', function () {
+    expect(ContentPlan::channelForUrl('https://www.instagram.com/p/abc/'))->toBe('instagram')
+        ->and(ContentPlan::channelForUrl('https://vt.tiktok.com/ZS123/'))->toBe('tiktok')
+        ->and(ContentPlan::channelForUrl('https://youtu.be/dQw4w9WgXcQ'))->toBe('youtube')
+        ->and(ContentPlan::channelForUrl('https://www.youtube.com/watch?v=1'))->toBe('youtube')
+        ->and(ContentPlan::channelForUrl('https://x.com/kisantra/status/1'))->toBe('twitter')
+        // Nothing to go on: the piece's own first channel is the honest guess.
+        ->and(ContentPlan::channelForUrl('https://kisantra.com/artikel', ['linkedin', 'web']))->toBe('linkedin')
+        ->and(ContentPlan::channelForUrl('https://kisantra.com/artikel'))->toBe('web');
 });

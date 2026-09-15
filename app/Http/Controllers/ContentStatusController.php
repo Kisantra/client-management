@@ -27,11 +27,16 @@ class ContentStatusController extends Controller
         $validated = $request->validate([
             'status' => ['required', Rule::in(ContentPlan::keys()), Rule::notIn([$content->status])],
             'published_at' => ['nullable', 'date'],
-            'url' => ['nullable', 'url', 'max:255'],
+            /* One address per channel it went out on, asked for at the moment
+               both are known. Only the channels sent are touched: going live
+               on Instagram today says nothing about the TikTok link. */
+            'links' => ['nullable', 'array:'.implode(',', ContentPlan::channelKeys())],
+            'links.*' => ['nullable', 'url', 'max:255'],
             'note' => ['nullable', 'string', 'max:500'],
         ], [
             'status.not_in' => 'Konten ini sudah ada di status tersebut.',
-            'url.url' => 'Tautan harus berupa alamat lengkap, diawali https://.',
+            'links.array' => 'Ada channel yang tidak dikenal di daftar tautan.',
+            'links.*.url' => 'Tautan harus berupa alamat lengkap, diawali https://.',
         ]);
 
         $from = ContentPlan::label($content->status);
@@ -45,10 +50,13 @@ class ContentStatusController extends Controller
                 'published_at' => $publishing
                     ? Carbon::parse($validated['published_at'] ?? $today)->toDateString()
                     : null,
-                ...(isset($validated['url']) && $validated['url'] !== ''
-                    ? ['url' => trim($validated['url'])]
-                    : []),
             ]);
+
+            foreach ($validated['links'] ?? [] as $channel => $url) {
+                if (trim((string) $url) !== '') {
+                    $content->links()->updateOrCreate(['channel' => $channel], ['url' => trim($url)]);
+                }
+            }
 
             $content->statusEvents()->create([
                 'status' => $content->status,

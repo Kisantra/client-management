@@ -1,8 +1,10 @@
 import { Head, Link } from '@inertiajs/react';
 import {
     CalendarDays,
+    Ellipsis,
     PencilLine,
     Plus,
+    Trash2,
     UserRoundPlus,
     UsersRound,
 } from 'lucide-react';
@@ -10,8 +12,16 @@ import type { ReactNode } from 'react';
 import { useState } from 'react';
 import { AddMemberDialog } from '@/components/team/add-member-dialog';
 import type { Invite } from '@/components/team/add-member-dialog';
-import { RoleDialog } from '@/components/team/role-dialog';
+import { EditMemberDialog } from '@/components/team/edit-member-dialog';
+import { RemoveMemberDialog } from '@/components/team/remove-member-dialog';
 import { Button } from '@/components/ui/button';
+import {
+    DropdownMenu,
+    DropdownMenuContent,
+    DropdownMenuItem,
+    DropdownMenuSeparator,
+    DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu';
 import { LOAD_SEGMENTS } from '@/data/team';
 import type { TeamMember, TeamTotals, TeamWeek } from '@/data/team';
 import { useContentStatusLabels } from '@/hooks/use-content-plan';
@@ -27,7 +37,8 @@ type Props = {
 
 export default function Anggota({ members, totals, week }: Props) {
     const [invite, setInvite] = useState<Invite | null>(null);
-    const [roleFor, setRoleFor] = useState<TeamMember | null>(null);
+    const [editing, setEditing] = useState<TeamMember | null>(null);
+    const [removing, setRemoving] = useState<TeamMember | null>(null);
 
     /* Every bar is drawn against the busiest member, so length compares. */
     const heaviest = Math.max(0, ...members.map((member) => member.active));
@@ -119,7 +130,8 @@ export default function Anggota({ members, totals, week }: Props) {
                                     key={member.name}
                                     member={member}
                                     heaviest={heaviest}
-                                    onRole={() => setRoleFor(member)}
+                                    onEdit={() => setEditing(member)}
+                                    onRemove={() => setRemoving(member)}
                                     onInvite={() =>
                                         setInvite({
                                             name: member.name,
@@ -140,7 +152,15 @@ export default function Anggota({ members, totals, week }: Props) {
             </div>
 
             <AddMemberDialog invite={invite} onClose={() => setInvite(null)} />
-            <RoleDialog member={roleFor} onClose={() => setRoleFor(null)} />
+            <EditMemberDialog
+                member={editing}
+                onClose={() => setEditing(null)}
+            />
+            <RemoveMemberDialog
+                member={removing}
+                members={members}
+                onClose={() => setRemoving(null)}
+            />
         </>
     );
 }
@@ -218,15 +238,26 @@ function Legend() {
     );
 }
 
+/**
+ * One person on the roster.
+ *
+ * The actions sit in a column of fixed width, identical on every row, so the
+ * load bars start and end at the same place down the whole list. They used to
+ * be sized by their own labels — "Buatkan akun" on one row, "Peran" on the
+ * next — and every bar ran to a different length for a reason that had
+ * nothing to do with the work.
+ */
 function MemberRow({
     member,
     heaviest,
-    onRole,
+    onEdit,
+    onRemove,
     onInvite,
 }: {
     member: TeamMember;
     heaviest: number;
-    onRole: () => void;
+    onEdit: () => void;
+    onRemove: () => void;
     onInvite: () => void;
 }) {
     const initials = useInitials();
@@ -234,94 +265,158 @@ function MemberRow({
     const calendarFor = content({ query: { pj: member.name } }).url;
 
     return (
-        <li className="grid gap-x-6 gap-y-3 p-4 sm:p-5 lg:grid-cols-[minmax(13rem,17rem)_minmax(0,1fr)_auto] lg:items-center">
-            <div className="flex min-w-0 items-center gap-3">
-                <span className="grid size-10 shrink-0 place-items-center rounded-full bg-primary-soft text-[0.8438rem] font-extrabold text-primary-deep">
-                    {initials(member.name)}
-                </span>
-                <div className="min-w-0">
-                    <p className="flex items-center gap-2 text-sm font-bold">
-                        <span className="truncate">{member.name}</span>
-                        {member.isYou ? (
-                            <span className="shrink-0 rounded-full bg-primary-soft px-2 py-0.5 text-[0.6875rem] font-bold text-primary-deep">
-                                Kamu
-                            </span>
-                        ) : null}
-                    </p>
-                    {member.userId ? (
-                        <p className="mt-0.5 truncate text-xs text-muted-foreground">
-                            {member.role ?? 'Peran belum diatur'} ·{' '}
-                            {member.email}
-                        </p>
-                    ) : (
-                        <p
-                            className="mt-0.5 text-xs text-muted-foreground"
-                            title="Namanya tercatat sebagai PJ konten. Buatkan akun dengan nama persis sama supaya tersambung."
-                        >
-                            <span className="rounded-full bg-neutral-soft px-2 py-0.5 font-semibold text-secondary-foreground">
-                                Belum punya akun
-                            </span>
-                        </p>
-                    )}
-                </div>
-            </div>
+        /*
+         | Two lines, shared across the row: the name and the bar on the
+         | first, what they are and how the week sits on the second. The
+         | avatar and the actions each span both lines, centred, so the row
+         | is mirrored left to right. Every line is a fixed 1.25rem, so a row
+         | with an email under the name and a row with the account chip stand
+         | exactly as tall as each other.
+         */
+        <li className="grid grid-cols-[2.5rem_minmax(0,1fr)_auto] items-center gap-x-3 gap-y-1.5 p-4 transition-colors hover:bg-neutral-soft/40 sm:p-5 xl:grid-cols-[2.5rem_minmax(10rem,15rem)_minmax(0,1fr)_8.75rem]">
+            <span className="col-start-1 row-span-2 row-start-1 grid size-10 place-items-center rounded-full bg-primary-soft text-[0.8438rem] font-extrabold text-primary-deep">
+                {initials(member.name)}
+            </span>
 
-            <div className="min-w-0">
-                <div className="flex items-center gap-3">
-                    <div className="flex h-2 flex-1 overflow-hidden rounded-full bg-muted">
-                        {heaviest > 0
-                            ? LOAD_SEGMENTS.map((segment) => (
-                                  <span
-                                      key={segment.key}
-                                      className={segment.className}
-                                      style={{
-                                          width: `${(member[segment.key] / heaviest) * 100}%`,
-                                      }}
-                                      aria-hidden
-                                  />
-                              ))
-                            : null}
-                    </div>
-                    <span
-                        className="w-14 shrink-0 text-right text-xs font-bold whitespace-nowrap"
-                        data-numeric
-                    >
-                        {member.active} aktif
+            <p className="col-start-2 row-start-1 flex h-5 min-w-0 items-center gap-2 text-sm leading-5 font-bold">
+                <span className="truncate">{member.name}</span>
+                {member.isYou ? (
+                    <span className="shrink-0 rounded-full bg-primary-soft px-2 text-[0.6875rem] leading-4 font-bold text-primary-deep">
+                        Kamu
                     </span>
-                </div>
+                ) : null}
+            </p>
 
-                <p className="mt-2 flex flex-wrap items-center gap-x-3.5 gap-y-1 text-xs text-muted-foreground">
-                    <Stat value={member.week} label="minggu ini" />
-                    {member.late > 0 ? (
-                        <span className="font-bold text-destructive">
-                            <span data-numeric>{member.late}</span> telat
+            <div className="col-start-2 row-start-2 flex h-5 min-w-0 items-center">
+                {member.userId ? (
+                    <p className="truncate text-xs leading-5 text-muted-foreground">
+                        {member.role ?? 'Peran belum diatur'} · {member.email}
+                    </p>
+                ) : (
+                    /* The gap and the way to close it, in one place. */
+                    <button
+                        type="button"
+                        onClick={onInvite}
+                        title="Namanya tercatat sebagai PJ. Buatkan akun dengan nama persis sama supaya tersambung."
+                        className="inline-flex h-5 items-center gap-1 rounded-full bg-neutral-soft px-2 text-xs font-semibold whitespace-nowrap text-secondary-foreground transition-colors hover:bg-primary-soft hover:text-primary-deep focus-visible:ring-2 focus-visible:ring-primary/40 focus-visible:outline-none"
+                    >
+                        Belum punya akun
+                        <span className="inline-flex items-center gap-0.5 text-primary-deep">
+                            <UserRoundPlus
+                                className="size-3"
+                                strokeWidth={2.25}
+                                aria-hidden
+                            />
+                            Buatkan
                         </span>
-                    ) : null}
-                    <Stat
-                        value={member.publishedMonth}
-                        label="tayang bulan ini"
-                    />
-                </p>
+                    </button>
+                )}
             </div>
 
-            <div className="flex flex-wrap items-center gap-1.5">
-                {member.userId ? (
-                    <Button variant="ghost" size="sm" onClick={onRole}>
-                        <PencilLine strokeWidth={1.75} aria-hidden />
-                        Peran
-                    </Button>
-                ) : (
-                    <Button variant="ghost" size="sm" onClick={onInvite}>
-                        <UserRoundPlus strokeWidth={1.75} aria-hidden />
-                        Buatkan akun
-                    </Button>
-                )}
-                <Button variant="ghost" size="sm" asChild>
+            {/* The bar on the name's line: length is the load, drawn against
+                the busiest member. */}
+            <div
+                className="col-span-3 row-start-3 mt-2.5 flex h-5 items-center xl:col-span-1 xl:col-start-3 xl:row-start-1 xl:mt-0 xl:pl-4"
+                role="img"
+                aria-label={`${member.active} konten aktif: ${member.draft} draft, ${member.review} review, ${member.approved} approved`}
+            >
+                <div className="flex h-2 w-full overflow-hidden rounded-full bg-muted">
+                    {heaviest > 0
+                        ? LOAD_SEGMENTS.map((segment) => (
+                              <span
+                                  key={segment.key}
+                                  className={segment.className}
+                                  style={{
+                                      width: `${(member[segment.key] / heaviest) * 100}%`,
+                                  }}
+                              />
+                          ))
+                        : null}
+                </div>
+            </div>
+
+            <p className="col-span-3 row-start-4 flex min-h-5 flex-wrap items-center gap-x-3.5 text-xs leading-5 text-muted-foreground xl:col-span-1 xl:col-start-3 xl:row-start-2 xl:pl-4">
+                <span className="font-bold text-foreground">
+                    <span data-numeric>{member.active}</span> aktif
+                </span>
+                <Stat value={member.week} label="minggu ini" />
+                {member.late > 0 ? (
+                    <span className="font-bold text-destructive">
+                        <span data-numeric>{member.late}</span> telat
+                    </span>
+                ) : null}
+                <Stat value={member.publishedMonth} label="tayang bulan ini" />
+            </p>
+
+            {/* Pulled out by the icon button's own inset, so the dots end
+                where the avatar begins on the other side: the same distance
+                from the card's edge. */}
+            <div className="col-start-3 row-span-2 row-start-1 -mr-2 flex items-center justify-end gap-1 xl:col-start-4 xl:pl-4">
+                <Button
+                    variant="ghost"
+                    size="sm"
+                    asChild
+                    className="text-secondary-foreground hover:text-primary-deep"
+                >
                     <Link href={calendarFor}>
                         <CalendarDays strokeWidth={1.75} aria-hidden />
-                        Kalender
+                        {/* A label on a wide screen, an icon on a phone where
+                            the name needs the room. */}
+                        <span className="sr-only sm:not-sr-only">Kalender</span>
                     </Link>
                 </Button>
+
+                {/* Not modal: the menu hands off to a dialog, and a modal
+                    menu closing under an opening dialog leaves the page
+                    unclickable. */}
+                <DropdownMenu modal={false}>
+                    <DropdownMenuTrigger asChild>
+                        <Button
+                            variant="ghost"
+                            size="icon"
+                            className="size-8 text-muted-foreground hover:text-foreground data-[state=open]:bg-neutral-soft data-[state=open]:text-foreground"
+                            aria-label={`Aksi untuk ${member.name}`}
+                        >
+                            <Ellipsis strokeWidth={2} aria-hidden />
+                        </Button>
+                    </DropdownMenuTrigger>
+                    <DropdownMenuContent
+                        align="end"
+                        sideOffset={6}
+                        className="w-56 rounded-lg p-1.5 shadow-lift-lg"
+                    >
+                        <DropdownMenuItem
+                            className="gap-2.5 py-2 text-[0.8438rem] font-semibold"
+                            onSelect={onEdit}
+                        >
+                            <PencilLine strokeWidth={2} aria-hidden />
+                            Edit anggota
+                        </DropdownMenuItem>
+                        {member.userId ? null : (
+                            <DropdownMenuItem
+                                className="gap-2.5 py-2 text-[0.8438rem] font-semibold"
+                                onSelect={onInvite}
+                            >
+                                <UserRoundPlus strokeWidth={2} aria-hidden />
+                                Buatkan akun
+                            </DropdownMenuItem>
+                        )}
+                        <DropdownMenuSeparator className="mx-1 my-1.5" />
+                        <DropdownMenuItem
+                            className="gap-2.5 py-2 text-[0.8438rem] font-semibold"
+                            disabled={member.isYou}
+                            onSelect={onRemove}
+                        >
+                            <Trash2 strokeWidth={2} aria-hidden />
+                            Hapus anggota
+                            {member.isYou ? (
+                                <span className="ml-auto text-[0.6875rem] font-semibold text-muted-foreground">
+                                    akunmu
+                                </span>
+                            ) : null}
+                        </DropdownMenuItem>
+                    </DropdownMenuContent>
+                </DropdownMenu>
             </div>
         </li>
     );

@@ -11,6 +11,7 @@ export type ChannelKey =
     | 'facebook'
     | 'twitter'
     | 'tiktok'
+    | 'youtube'
     | 'linkedin'
     | 'web'
     | 'whatsapp';
@@ -37,6 +38,7 @@ export const CHANNEL_LABELS: Record<ChannelKey, string> = {
     facebook: 'Facebook',
     twitter: 'Twitter',
     tiktok: 'TikTok',
+    youtube: 'YouTube',
     linkedin: 'LinkedIn',
     web: 'Web/SEO',
     whatsapp: 'WhatsApp',

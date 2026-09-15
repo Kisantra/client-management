@@ -17,6 +17,7 @@ use App\Http\Controllers\LeadStageController;
 use App\Http\Controllers\NewsController;
 use App\Http\Controllers\NotificationController;
 use App\Http\Controllers\PerformanceController;
+use App\Http\Controllers\PerformanceReportController;
 use App\Http\Controllers\ReportController;
 use App\Http\Controllers\SocialVideoController;
 use App\Http\Controllers\TeamController;
@@ -125,6 +126,13 @@ Route::middleware(['auth', 'verified'])->group(function () {
         ->whereIn('part', ['konten', 'lead'])
         ->name('report.export');
 
+    /* The quarter on the accounts, as a document: read on screen, sent as a
+       PDF. Both come from one computation. */
+    Route::get('laporan/performa', PerformanceReportController::class)
+        ->name('report.performance');
+    Route::get('laporan/performa/pdf', [PerformanceReportController::class, 'download'])
+        ->name('report.performance.pdf');
+
     /* The log of what the team did, read as a page of its own rather than a
        panel bolted onto each record. */
     Route::get('aktivitas', ActivityController::class)->name('activity');
@@ -134,6 +142,13 @@ Route::middleware(['auth', 'verified'])->group(function () {
     Route::patch('team/{user}', [TeamController::class, 'update'])
         ->whereNumber('user')
         ->name('team.update');
+    Route::delete('team/{user}', [TeamController::class, 'destroy'])
+        ->whereNumber('user')
+        ->name('team.destroy');
+    /* A PJ without an account has no id to address, so the name travels in
+       the request body instead. */
+    Route::patch('team/pj', [TeamController::class, 'renameName'])->name('team.pj.update');
+    Route::delete('team/pj', [TeamController::class, 'destroyName'])->name('team.pj.destroy');
 });
 
 require __DIR__.'/settings.php';

@@ -3,12 +3,15 @@
 namespace App\Support;
 
 use App\Models\Content;
+use App\Models\ContentLink;
 use App\Models\Lead;
 use App\Models\LeadStageEvent;
 use Carbon\CarbonInterface;
 use Illuminate\Database\Eloquent\Builder;
+use Illuminate\Database\Eloquent\Model;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Collection;
+use Illuminate\Support\Str;
 
 /**
  * One period's work, counted once and read the same way by every surface.
@@ -114,6 +117,15 @@ class Report
     {
         $before = $this->previous();
 
+        /*
+         | The same figure over the six periods ending in this one, oldest
+         | first, for the small chart beside it. One comparison says whether
+         | this period moved; six say whether that movement is news or the
+         | ordinary wobble of a small team's calendar.
+         */
+        $recent = collect(range(-5, 0))->map(fn (int $by) => $this->shifted($by));
+        $series = fn (callable $count) => $recent->map(fn (self $period) => $count($period))->all();
+
         return [
             [
                 'key' => 'leads',
@@ -121,6 +133,7 @@ class Report
                 'value' => $this->leadsIn($this),
                 'was' => $this->leadsIn($before),
                 'note' => 'lead baru tercatat',
+                'series' => $series(fn (self $period) => $this->leadsIn($period)),
             ],
             [
                 'key' => 'clients',
@@ -128,6 +141,7 @@ class Report
                 'value' => $this->becameClient($this),
                 'was' => $this->becameClient($before),
                 'note' => 'lead yang naik ke client pada periode ini',
+                'series' => $series(fn (self $period) => $this->becameClient($period)),
             ],
             [
                 'key' => 'published',
@@ -135,6 +149,7 @@ class Report
                 'value' => $this->published($this),
                 'was' => $this->published($before),
                 'note' => 'dari jadwal periode ini',
+                'series' => $series(fn (self $period) => $this->published($period)),
             ],
             [
                 'key' => 'late',
@@ -142,6 +157,7 @@ class Report
                 'value' => $this->late($this),
                 'was' => $this->late($before),
                 'note' => 'lewat tanggal, belum tayang',
+                'series' => $series(fn (self $period) => $this->late($period)),
             ],
         ];
     }
@@ -215,7 +231,7 @@ class Report
             ->groupBy(fn (Lead $lead) => (string) $lead->channel)
             ->map(fn (Collection $group, string $channel) => [
                 'key' => $channel,
-                'label' => ContentPlan::channelLabel($channel),
+                'label' => Pipeline::channels()[$channel] ?? ContentPlan::channelLabel($channel),
                 'leads' => $group->count(),
                 'value' => (int) $group->sum('value'),
                 /* Of the leads that came in during the period, how many are
@@ -232,42 +248,164 @@ class Report
     }
 
     /**
-     * The pieces that actually brought somebody in.
+     * The period's posts on the accounts Performa follows, best first.
      *
-     * The link is the lead's own `content_id`, so this is the one table in the
-     * report that answers the question the whole app is built around: which
-     * content earned a client.
+     * Ranked by how far each post rose above what its own account usually
+     * earns, not by the raw count. The two platforms keep different books —
+     * TikTok adds shares and saves to the likes and comments that are all an
+     * Instagram scrape can see, and it shows a clip to strangers rather than
+     * to followers — so a raw ranking would put TikTok on top by arithmetic
+     * alone. Against its own account's median every post is judged by the one
+     * standard that is fair to it, and inside a single platform the order is
+     * exactly the order of the raw count.
      *
-     * @return array<int, array{title: string, channels: array<int, string>, leads: int, clients: int}>
+     * Every post in the period is sent, not a top few: the page filters by
+     * platform, and a top six cut before the filter would leave the TikTok tab
+     * showing whichever clips happened to survive an Instagram-heavy list.
+     *
+     * @return array{
+     *     posts: array<int, array<string, mixed>>,
+     *     platforms: array<int, array{key: string, label: string, posts: int, typical: float}>
+     * }
      */
-    public function earning(): array
+    public function topContent(): array
     {
-        $leads = $this->leadsQuery($this)
-            ->whereNotNull('content_id')
-            ->get(['content_id', 'stage', 'status']);
+        ['rows' => $ledger, 'platforms' => $accounts] = $this->ledger();
 
-        if ($leads->isEmpty()) {
-            return [];
-        }
+        $found = $ledger
+            ->filter(fn (array $row) => $row['post']->posted_at->between($this->start, $this->end))
+            ->values();
 
-        $pieces = Content::query()
-            ->whereIn('id', $leads->pluck('content_id')->unique())
-            ->get(['id', 'title', 'channels'])
-            ->keyBy('id');
-
-        return $leads
-            ->groupBy('content_id')
-            ->map(fn (Collection $group, $id) => [
-                'title' => (string) ($pieces[$id]->title ?? 'Konten terhapus'),
-                'channels' => $pieces[$id]->channels ?? [],
-                'leads' => $group->count(),
-                'clients' => $group
-                    ->filter(fn (Lead $lead) => $lead->stage === 'client' && $lead->status === Lead::ACTIVE)
-                    ->count(),
+        $platforms = collect($accounts)
+            ->map(fn (array $account) => [
+                'key' => $account['key'],
+                'label' => $account['label'],
+                'posts' => $found->where('platform', $account['key'])->count(),
+                'typical' => $account['typical'],
             ])
-            ->sortByDesc('leads')
+            ->all();
+
+        /* The calendar piece behind a post, when somebody tied one to it, and
+           the leads that piece brought in — the bridge from "it did well" to
+           "it did well for the business". */
+        $links = ContentLink::query()
+            ->whereIn('url', $found->map(fn (array $row) => $row['post']->url)->filter()->all())
+            ->with('content:id,title')
+            ->get()
+            ->keyBy('url');
+
+        $leads = $links->isEmpty() ? collect() : Lead::query()
+            ->whereIn('content_id', $links->pluck('content_id')->unique())
+            ->selectRaw('content_id, count(*) as total')
+            ->groupBy('content_id')
+            ->pluck('total', 'content_id');
+
+        $posts = $found
+            ->map(function (array $row) use ($links, $leads) {
+                /** @var Model $post */
+                $post = $row['post'];
+                $link = $post->url ? $links->get($post->url) : null;
+                $interactions = $post->interactions();
+
+                return [
+                    'id' => $row['platform'].':'.$post->key(),
+                    'platform' => $row['platform'],
+                    'url' => $post->url,
+                    'href' => route('performance.content', [
+                        'platform' => $row['platform'],
+                        'konten' => $post->key(),
+                    ], false),
+                    'caption' => Str::limit(
+                        trim((string) preg_replace('/\s+/u', ' ', (string) $post->caption)),
+                        220,
+                        '…',
+                    ) ?: null,
+                    'thumbnail' => $post->thumb(),
+                    'format' => $post->format(),
+                    'postedAt' => $post->posted_at->toDateString(),
+                    'likes' => (int) $post->likes,
+                    'comments' => (int) $post->comments,
+                    'plays' => $post->plays(),
+                    'shares' => $post->shares(),
+                    'saves' => $post->saves(),
+                    'interactions' => $interactions,
+                    'typical' => round($row['typical'], 1),
+                    /* Null rather than infinite when the account's typical
+                       post earned nothing: "∞× biasanya" is not a finding. */
+                    'lift' => $row['typical'] > 0 ? round($interactions / $row['typical'], 2) : null,
+                    'content' => $link?->content ? [
+                        'title' => (string) $link->content->title,
+                        'leads' => (int) ($leads[$link->content_id] ?? 0),
+                    ] : null,
+                ];
+            })
+            ->sort(fn (array $a, array $b) => [$b['lift'] ?? 0, $b['interactions']] <=> [$a['lift'] ?? 0, $a['interactions']])
             ->values()
             ->all();
+
+        return ['posts' => $posts, 'platforms' => $platforms];
+    }
+
+    /**
+     * Which kinds of content have earned more than usual, over everything on
+     * record and over this period alone.
+     *
+     * @return array<string, mixed>
+     */
+    public function patterns(): array
+    {
+        ['rows' => $ledger, 'platforms' => $accounts] = $this->ledger();
+
+        return [
+            ...(new ContentPatterns($ledger, $this->start, $this->end))->toArray(),
+            'baseline' => $accounts,
+        ];
+    }
+
+    /**
+     * Every stored post on the accounts Performa follows, each with its own
+     * account's typical post beside it. Read once per report: the top posts
+     * and the patterns both start here.
+     *
+     * @return array{
+     *     rows: Collection<int, array{platform: string, post: Model, typical: float}>,
+     *     platforms: array<int, array{key: string, label: string, typical: float, posts: int}>
+     * }
+     */
+    private function ledger(): array
+    {
+        return once(function () {
+            $rows = collect();
+            $platforms = [];
+
+            foreach (SocialPlatform::KEYS as $key) {
+                $platform = SocialPlatform::for($key);
+                $profile = $platform->profile();
+
+                if (! $profile) {
+                    continue;
+                }
+
+                /* "Usually" is everything on record for the account, not just
+                   this period: a month's own median would call half of any
+                   month above average by definition. */
+                $all = $profile->posts()->get();
+                $typical = PerformanceReport::median($all->map(fn (Model $post) => $post->interactions()));
+
+                $platforms[] = [
+                    'key' => $key,
+                    'label' => $platform->label(),
+                    'typical' => round($typical, 1),
+                    'posts' => $all->count(),
+                ];
+
+                foreach ($all as $post) {
+                    $rows->push(['platform' => $key, 'post' => $post, 'typical' => $typical]);
+                }
+            }
+
+            return ['rows' => $rows, 'platforms' => $platforms];
+        });
     }
 
     /**
@@ -286,7 +424,7 @@ class Report
                 'PJ' => (string) $piece->owner,
                 'Terlambat' => $piece->isLate() ? 'ya' : 'tidak',
                 'Tayang pada' => $piece->published_at?->toDateString() ?? '',
-                'Tautan' => (string) $piece->url,
+                'Tautan' => implode(' ', $piece->linkMap()),
             ])
             ->all();
     }
@@ -340,6 +478,7 @@ class Report
     private function contentInPeriod(): Collection
     {
         return once(fn () => Content::query()
+            ->with('links')
             ->whereBetween('scheduled_for', [$this->start, $this->end])
             ->orderBy('scheduled_for')
             ->orderBy('id')

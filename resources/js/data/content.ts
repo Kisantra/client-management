@@ -29,7 +29,11 @@ export type ContentRow = {
     /** The day it did, once it has. */
     publishedAt: string | null;
     owner: string | null;
-    url: string | null;
+    /**
+     * Where it went live, one address per channel. A piece on Instagram and
+     * TikTok has two, so this is a map rather than a single link.
+     */
+    links: Partial<Record<ChannelKey, string>>;
     /** Past its date and still not live. */
     late: boolean;
     daysLate: number;
@@ -66,7 +70,7 @@ export type EditableContent = {
     brief: string | null;
     referenceUrl: string | null;
     caption: string | null;
-    url: string | null;
+    links: Partial<Record<ChannelKey, string>>;
 };
 
 export type ContentEvent = {

@@ -207,6 +207,8 @@ class ContentController extends Controller
                 'at' => $today,
             ]);
 
+            $this->syncLinks($content, $request->links());
+
             /*
              | Started from the idea backlog: the idea now points at the piece
              | it became, so it reads there as done rather than lost.
@@ -254,7 +256,7 @@ class ContentController extends Controller
      */
     private function detail(Content $content): array
     {
-        $content->load('statusEvents')->loadCount([
+        $content->load(['statusEvents', 'links'])->loadCount([
             'leads',
             'leads as clients_count' => fn (Builder $query) => $query
                 ->where('status', 'aktif')
@@ -292,9 +294,20 @@ class ContentController extends Controller
             // The review, said out loud: every note, open ones on top.
             'comments' => $content->comments->map->toRow()->all(),
 
-            /* What the piece actually did, once its Tautan points at a post
-               Performa follows. Null otherwise, and the panel says nothing. */
-            'live' => ReleasedPosts::find($content->url),
+            /*
+             | What the piece actually did, once a Tautan points at a post
+             | Performa follows — one entry per channel that has one. A piece
+             | on Instagram and TikTok did two different things, and the two
+             | sets of figures side by side are the comparison worth having.
+             |
+             | Empty when nothing is linked, or when the links point somewhere
+             | Performa does not follow, and the panel then says nothing.
+             */
+            'live' => collect($content->linkMap())
+                ->map(fn (string $url) => ReleasedPosts::find($url))
+                ->filter()
+                ->values()
+                ->all(),
         ];
     }
 
@@ -330,6 +343,8 @@ class ContentController extends Controller
                     'at' => $today,
                 ]);
             }
+
+            $this->syncLinks($content, $request->links());
         });
 
         // The edit form is the other door into the QA flow; it rings the same bell.
@@ -349,6 +364,24 @@ class ContentController extends Controller
         $this->toast('Perubahan tersimpan', $content->title.' sudah diperbarui.');
 
         return $this->toContent($content);
+    }
+
+    /**
+     * The piece's addresses, made to match what was sent.
+     *
+     * A channel left out of the map has no link, so its row goes: a blank in
+     * the form means "not published there", and a row holding an empty address
+     * would be the record claiming otherwise.
+     *
+     * @param  array<string, string>  $links
+     */
+    private function syncLinks(Content $content, array $links): void
+    {
+        $content->links()->whereNotIn('channel', array_keys($links))->delete();
+
+        foreach ($links as $channel => $url) {
+            $content->links()->updateOrCreate(['channel' => $channel], ['url' => $url]);
+        }
     }
 
     /** Back to the calendar, on the piece's month, with its panel open. */
