@@ -83,6 +83,11 @@ class Lead extends Model
         return $this->hasMany(LeadAttachment::class);
     }
 
+    public function letters(): HasMany
+    {
+        return $this->hasMany(Letter::class);
+    }
+
     /** Full display name, e.g. "PT Sinar Rejeki". */
     public function displayName(): string
     {

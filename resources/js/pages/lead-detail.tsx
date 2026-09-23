@@ -23,6 +23,7 @@ import { NoteComposer } from '@/components/leads/note-composer';
 import { OfficeMap } from '@/components/leads/office-map';
 import { STAGE_DOT } from '@/components/leads/stage-mark';
 import { StageMoveDialog } from '@/components/leads/stage-move-dialog';
+import { StatusPill } from '@/components/letters/status-pill';
 import { Button } from '@/components/ui/button';
 import {
     DropdownMenu,
@@ -41,6 +42,7 @@ import type {
     NoteFile,
     StageStep,
 } from '@/data/leads';
+import type { LetterRow } from '@/data/letters';
 import {
     usePipeline,
     useStageLabels,
@@ -52,12 +54,15 @@ import { show as contentShow } from '@/routes/content';
 import { edit as leadEdit } from '@/routes/leads';
 import { destroy as reopenLead } from '@/routes/leads/closure';
 import { update as updateFollowUp } from '@/routes/leads/follow-ups';
+import { create as letterCreate, show as letterShow } from '@/routes/letters';
 
 type Props = {
     lead: LeadDetail;
     timeline: StageStep[];
     notes: LeadNote[];
     followUps: FollowUp[];
+    /** What has been written to this lead on the letterhead, newest first. */
+    letters: LetterRow[];
 };
 
 export default function LeadDetailPage({
@@ -65,6 +70,7 @@ export default function LeadDetailPage({
     timeline,
     notes,
     followUps,
+    letters,
 }: Props) {
     const [pendingStage, setPendingStage] = useState<string | null>(null);
     const [followUpOpen, setFollowUpOpen] = useState(false);
@@ -444,6 +450,65 @@ export default function LeadDetailPage({
                                     </p>
                                 </div>
                             ) : null}
+                        </Panel>
+
+                        <Panel
+                            title="Surat"
+                            description="Penawaran dan surat lain yang dibuat untuk client ini."
+                        >
+                            {letters.length === 0 ? (
+                                <p className="rounded-lg border border-dashed border-border bg-neutral-soft/60 px-3 py-5 text-center text-xs text-muted-foreground">
+                                    Belum ada surat untuk client ini.
+                                </p>
+                            ) : (
+                                <ul className="flex flex-col divide-y divide-border">
+                                    {letters.map((letter) => (
+                                        <li key={letter.id}>
+                                            <Link
+                                                href={letterShow(letter.id)}
+                                                prefetch
+                                                className="flex items-start justify-between gap-3 py-2.5 first:pt-0 last:pb-0"
+                                            >
+                                                <span className="min-w-0">
+                                                    <span className="block truncate text-[0.8438rem] font-bold">
+                                                        {letter.subject}
+                                                    </span>
+                                                    <span
+                                                        className="block truncate text-xs text-muted-foreground"
+                                                        data-numeric
+                                                    >
+                                                        {letter.number ??
+                                                            'Belum bernomor'}{' '}
+                                                        ·{' '}
+                                                        {entryDate(letter.date)}
+                                                    </span>
+                                                </span>
+                                                <StatusPill
+                                                    status={letter.status}
+                                                    label={letter.statusLabel}
+                                                    className="shrink-0"
+                                                />
+                                            </Link>
+                                        </li>
+                                    ))}
+                                </ul>
+                            )}
+
+                            {closed ? null : (
+                                <Link
+                                    href={letterCreate({
+                                        query: { lead: lead.id },
+                                    })}
+                                    className="mt-4 inline-flex items-center gap-1.5 rounded-md bg-primary-soft px-3 py-2 text-[0.8438rem] font-bold text-primary-deep transition-colors hover:bg-accent"
+                                >
+                                    <Plus
+                                        className="size-3.5"
+                                        strokeWidth={2.5}
+                                        aria-hidden
+                                    />
+                                    Buat surat
+                                </Link>
+                            )}
                         </Panel>
 
                         <Panel

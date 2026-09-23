@@ -35,10 +35,14 @@ function Calendar({ className, classNames, ...props }: DayPickerProps) {
                     'size-9 rounded-md font-semibold tabular-nums transition-colors hover:bg-neutral-soft aria-selected:font-bold',
                 selected:
                     'bg-primary-soft [&_button]:text-primary-deep [&_button]:hover:bg-primary-soft',
+                /* Important, because a range's ends are also "selected": both
+                   set the same fill and ink, and whichever utility lands later
+                   in the stylesheet wins — which left the two days that
+                   define the range the palest in it. */
                 range_start:
-                    'rounded-l-md bg-primary [&_button]:text-primary-foreground [&_button]:hover:bg-primary',
+                    'rounded-l-md bg-primary! [&_button]:text-primary-foreground! [&_button]:hover:bg-primary!',
                 range_end:
-                    'rounded-r-md bg-primary [&_button]:text-primary-foreground [&_button]:hover:bg-primary',
+                    'rounded-r-md bg-primary! [&_button]:text-primary-foreground! [&_button]:hover:bg-primary!',
                 range_middle: 'bg-primary-soft [&_button]:text-primary-deep',
                 today: '[&_button]:underline [&_button]:decoration-primary [&_button]:decoration-2',
                 outside: 'text-muted-foreground/50',

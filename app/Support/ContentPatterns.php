@@ -18,8 +18,8 @@ use Illuminate\Support\Str;
  * a whole format look like a winner.
  *
  * Two kinds of category, from two places, and the difference is said out
- * loud rather than hidden. Format, length and posting day belong to the post
- * itself, so every scraped post counts. Pillar and content type belong to the
+ * loud rather than hidden. Format, length, posting day and posting hour
+ * belong to the post itself, so every scraped post counts. Pillar and content type belong to the
  * calendar piece, and a post only has one when somebody tied the two together
  * — so those groups are counted from the linked posts alone, and the page is
  * told how few that is.
@@ -32,11 +32,14 @@ class ContentPatterns
     /*
      | The firm posts from Jakarta. Timestamps are stored in UTC, and a post
      | that went up at eight in the evening would otherwise be filed under the
-     | next day.
+     | next day — and every posting hour would read seven hours early.
      */
     private const LOCAL = 'Asia/Jakarta';
 
     private const WEEKDAYS = ['Senin', 'Selasa', 'Rabu', 'Kamis', 'Jumat', 'Sabtu', 'Minggu'];
+
+    /** Hours per posting-time slot. */
+    private const SLOT = 2;
 
     /** Each bucket's upper bound in seconds, and its name. */
     private const LENGTHS = [
@@ -104,6 +107,7 @@ class ContentPatterns
                     'format' => $post->format(),
                     'seconds' => $post->seconds(),
                     'weekday' => $post->posted_at->copy()->setTimezone(self::LOCAL)->dayOfWeekIso,
+                    'hour' => $post->posted_at->copy()->setTimezone(self::LOCAL)->hour,
                     'type' => $piece?->type,
                     'pillar' => $piece?->pillar,
                     'inPeriod' => $post->posted_at->between($this->start, $this->end),
@@ -165,6 +169,19 @@ class ContentPatterns
                     rows: $rows,
                     group: fn (array $row) => $row['weekday'],
                     name: fn ($key) => self::WEEKDAYS[(int) $key - 1],
+                    ordered: true,
+                ),
+                /* Two-hour slots. A single hour holds three or four posts on
+                   an account this size, which is noise; two hours holds
+                   enough to say something, and still tells a morning post
+                   from a lunchtime one. */
+                $this->dimension(
+                    key: 'hour',
+                    label: 'Jam tayang',
+                    source: 'post',
+                    rows: $rows,
+                    group: fn (array $row) => intdiv((int) $row['hour'], self::SLOT),
+                    name: fn ($key) => sprintf('%02d.00–%02d.00', (int) $key * self::SLOT, ((int) $key + 1) * self::SLOT),
                     ordered: true,
                 ),
             ],

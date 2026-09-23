@@ -82,6 +82,8 @@ export type SharedProps = {
         clients: number;
         content: number;
         ideas: number;
+        /** Letters begun and not yet issued. */
+        letters: number;
         team: number;
     } | null;
     /** Who may be put down as PJ, accounts first. */

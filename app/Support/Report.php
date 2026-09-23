@@ -32,6 +32,9 @@ class Report
 
     public const WEEKLY = 'minggu';
 
+    /** Any two dates somebody picked, compared with as many days before them. */
+    public const CUSTOM = 'khusus';
+
     private const MONTHS = [
         'Januari', 'Februari', 'Maret', 'April', 'Mei', 'Juni',
         'Juli', 'Agustus', 'September', 'Oktober', 'November', 'Desember',
@@ -62,17 +65,56 @@ class Report
             : new self($kind, $anchor->copy()->startOfMonth(), $anchor->copy()->endOfMonth());
     }
 
+    /**
+     * The range between two picked dates, both days included.
+     *
+     * Dates that will not parse, or that run backwards, give the month
+     * instead: a mistyped address should still show a report, not an error
+     * page or an empty one.
+     */
+    public static function between(?string $from, ?string $to): self
+    {
+        $start = self::date($from);
+        $end = self::date($to);
+
+        if (! $start || ! $end || $start->gt($end)) {
+            return self::make(self::MONTHLY);
+        }
+
+        return new self(self::CUSTOM, $start->startOfDay(), $end->endOfDay());
+    }
+
+    /** How many days the period covers, both ends included. */
+    public function days(): int
+    {
+        return (int) round($this->start->copy()->startOfDay()->diffInDays($this->end->copy()->startOfDay())) + 1;
+    }
+
     /** The same length of time, immediately before this one. */
     public function previous(): self
     {
-        return $this->kind === self::WEEKLY
-            ? self::make($this->kind, $this->start->copy()->subWeek()->toDateString())
-            : self::make($this->kind, $this->start->copy()->subMonth()->toDateString());
+        return $this->shifted(-1);
     }
 
-    /** The step in either direction, for the page's own navigation. */
+    /**
+     * The step in either direction, for the page's own navigation.
+     *
+     * A custom range steps by its own length, so "1–20 Agustus" is followed
+     * by the twenty days after it and compared with the twenty before — the
+     * only neighbour a range of arbitrary length has that is a fair match.
+     */
     public function shifted(int $by): self
     {
+        if ($this->kind === self::CUSTOM) {
+            $days = $by * $this->days();
+
+            return new self(
+                self::CUSTOM,
+                $this->start->copy()->addDays($days)->startOfDay(),
+                $this->end->copy()->addDays($days)->endOfDay(),
+            );
+        }
+
         $anchor = $this->kind === self::WEEKLY
             ? $this->start->copy()->addWeeks($by)
             : $this->start->copy()->addMonthsNoOverflow($by);
@@ -80,18 +122,23 @@ class Report
         return self::make($this->kind, $anchor->toDateString());
     }
 
-    /** "September 2026", or "7–13 September 2026". */
+    /** "September 2026", "7–13 September 2026", or "28 Desember 2025–5 Januari 2026". */
     public function label(): string
     {
         if ($this->kind === self::MONTHLY) {
             return self::MONTHS[$this->start->month - 1].' '.$this->start->year;
         }
 
-        $sameMonth = $this->start->month === $this->end->month;
+        $start = $this->start;
+        $end = $this->end;
+        $month = fn (Carbon $date) => self::MONTHS[$date->month - 1];
 
-        return $this->start->day
-            .($sameMonth ? '' : ' '.self::MONTHS[$this->start->month - 1])
-            .'–'.$this->end->day.' '.self::MONTHS[$this->end->month - 1].' '.$this->end->year;
+        return match (true) {
+            $start->isSameDay($end) => $end->day.' '.$month($end).' '.$end->year,
+            $start->year !== $end->year => $start->day.' '.$month($start).' '.$start->year.'–'.$end->day.' '.$month($end).' '.$end->year,
+            $start->month !== $end->month => $start->day.' '.$month($start).'–'.$end->day.' '.$month($end).' '.$end->year,
+            default => $start->day.'–'.$end->day.' '.$month($end).' '.$end->year,
+        };
     }
 
     /** A filename stem nobody has to rename: kisantra-laporan-2026-09. */
@@ -100,6 +147,19 @@ class Report
         return $this->kind === self::MONTHLY
             ? $this->start->format('Y-m')
             : $this->start->format('Y-m-d').'-sd-'.$this->end->format('Y-m-d');
+    }
+
+    /**
+     * The address query that opens this exact period again — for the page's
+     * arrows, its exports, and anybody the link is sent to.
+     *
+     * @return array<string, string>
+     */
+    public function query(): array
+    {
+        return $this->kind === self::CUSTOM
+            ? ['periode' => self::CUSTOM, 'dari' => $this->start->toDateString(), 'sampai' => $this->end->toDateString()]
+            : ['periode' => $this->kind, 'pada' => $this->start->toDateString()];
     }
 
     /** Whether the period has finished, so the page can say a figure is partial. */
@@ -455,7 +515,7 @@ class Report
             ->all();
     }
 
-    /** @return array{kind: string, label: string, start: string, end: string, slug: string, open: bool} */
+    /** @return array{kind: string, label: string, start: string, end: string, days: int, slug: string, open: bool, query: array<string, string>} */
     public function toArray(): array
     {
         return [
@@ -463,9 +523,24 @@ class Report
             'label' => $this->label(),
             'start' => $this->start->toDateString(),
             'end' => $this->end->toDateString(),
+            'days' => $this->days(),
             'slug' => $this->slug(),
             'open' => $this->isOpen(),
+            'query' => $this->query(),
         ];
+    }
+
+    private static function date(?string $value): ?Carbon
+    {
+        if ($value === null || preg_match('/^\d{4}-\d{2}-\d{2}$/', $value) !== 1) {
+            return null;
+        }
+
+        try {
+            return Carbon::createFromFormat('Y-m-d', $value);
+        } catch (\Throwable) {
+            return null;
+        }
     }
 
     /** A short date for a heading: 9 Sep 2026. */

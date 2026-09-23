@@ -14,6 +14,11 @@ use App\Http\Controllers\LeadController;
 use App\Http\Controllers\LeadFollowUpController;
 use App\Http\Controllers\LeadNoteController;
 use App\Http\Controllers\LeadStageController;
+use App\Http\Controllers\LetterCancelController;
+use App\Http\Controllers\LetterController;
+use App\Http\Controllers\LetterIssueController;
+use App\Http\Controllers\LetterPdfController;
+use App\Http\Controllers\LetterTemplateController;
 use App\Http\Controllers\NewsController;
 use App\Http\Controllers\NotificationController;
 use App\Http\Controllers\PerformanceController;
@@ -136,6 +141,37 @@ Route::middleware(['auth', 'verified'])->group(function () {
     /* The log of what the team did, read as a page of its own rather than a
        panel bolted onto each record. */
     Route::get('aktivitas', ActivityController::class)->name('activity');
+
+    /* Letters written here, on the letterhead: drafted from a template
+       against a lead, issued with a number, sent as the PDF. The fixed
+       paths sit above {letter} so "baru" and "template" are never read as
+       an id. */
+    Route::get('surat', [LetterController::class, 'index'])->name('letters');
+    Route::post('surat', [LetterController::class, 'store'])->name('letters.store');
+    Route::get('surat/baru', [LetterController::class, 'create'])->name('letters.create');
+
+    Route::get('surat/template', [LetterTemplateController::class, 'index'])->name('letters.templates');
+    Route::post('surat/template/pasang', [LetterTemplateController::class, 'seed'])->name('letters.templates.seed');
+    Route::get('surat/template/{template}', [LetterTemplateController::class, 'edit'])
+        ->whereNumber('template')
+        ->name('letters.templates.edit');
+    Route::patch('surat/template/{template}', [LetterTemplateController::class, 'update'])
+        ->whereNumber('template')
+        ->name('letters.templates.update');
+    Route::post('surat/template/{template}/pulihkan', [LetterTemplateController::class, 'restore'])
+        ->whereNumber('template')
+        ->name('letters.templates.restore');
+
+    Route::prefix('surat/{letter}')->whereNumber('letter')->group(function () {
+        Route::get('/', [LetterController::class, 'show'])->name('letters.show');
+        Route::patch('/', [LetterController::class, 'update'])->name('letters.update');
+        Route::delete('/', [LetterController::class, 'destroy'])->name('letters.destroy');
+
+        Route::post('terbit', [LetterIssueController::class, 'store'])->name('letters.issue.store');
+        Route::delete('terbit', [LetterIssueController::class, 'destroy'])->name('letters.issue.destroy');
+        Route::post('batal', LetterCancelController::class)->name('letters.cancel');
+        Route::get('pdf', LetterPdfController::class)->name('letters.pdf');
+    });
 
     Route::get('team', [TeamController::class, 'index'])->name('team');
     Route::post('team', [TeamController::class, 'store'])->name('team.store');

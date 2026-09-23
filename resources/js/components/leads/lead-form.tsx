@@ -32,6 +32,7 @@ import { usePipeline, useStageLabels } from '@/hooks/use-pipeline';
 import { cn } from '@/lib/utils';
 import { clients, leads } from '@/routes';
 import { store as leadsStore, update as leadsUpdate } from '@/routes/leads';
+import { create as lettersCreate } from '@/routes/letters';
 import type { SharedProps } from '@/types/shared';
 
 const ENTITIES = ['PT', 'CV', 'UD', 'Koperasi', 'Perorangan'];
@@ -114,6 +115,7 @@ export function LeadForm({
     services,
     contents,
     initialStage = 'lead',
+    after = null,
 }: {
     lead: EditableLead | null;
     services: string[];
@@ -121,6 +123,8 @@ export function LeadForm({
     contents: Record<string, ContentOption[]>;
     /** Where a new lead starts. The Client page opens the form on 'client'. */
     initialStage?: string;
+    /** 'surat' when opened from the letter form: saving goes back there. */
+    after?: 'surat' | null;
 }) {
     const { stages } = usePipeline();
     const stageLabels = useStageLabels();
@@ -186,7 +190,17 @@ export function LeadForm({
      | doing, and the way back leads to where the client will appear.
      */
     const creatingClient = lead === null && initialStage === 'client';
-    const back = creatingClient ? clients() : leads();
+    const forLetter = lead === null && after === 'surat';
+    const back = forLetter
+        ? lettersCreate()
+        : creatingClient
+          ? clients()
+          : leads();
+    const backLabel = forLetter
+        ? 'Buat surat'
+        : creatingClient
+          ? 'Client'
+          : 'Leads';
     const saveLabel = saving
         ? 'Menyimpan…'
         : lead
@@ -290,6 +304,7 @@ export function LeadForm({
             stage,
             owner: owner.trim(),
             files: attachments.map((item) => item.file),
+            after: after ?? '',
         };
 
         router.post(
@@ -346,7 +361,7 @@ export function LeadForm({
                                 strokeWidth={2.5}
                                 aria-hidden
                             />
-                            Kembali ke {creatingClient ? 'Client' : 'Leads'}
+                            Kembali ke {backLabel}
                         </Link>
                         <h1 className="mt-2 text-2xl font-extrabold tracking-[-0.03em] sm:text-[1.5625rem]">
                             {lead

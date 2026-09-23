@@ -1,38 +1,56 @@
 import { LeadForm } from '@/components/leads/lead-form';
 import type { ContentOption } from '@/components/leads/lead-form';
-import { clients, leads } from '@/routes';
+import { clients, leads, letters } from '@/routes';
 import { create as leadsCreate } from '@/routes/leads';
+import { create as lettersCreate } from '@/routes/letters';
 
 type Props = {
     services: string[];
     contents: Record<string, ContentOption[]>;
     /** The stage the form opens on: 'client' when it comes from the Client page. */
     stage: string;
+    /** 'surat' when the form was opened from the letter form; saving returns there. */
+    after: 'surat' | null;
 };
 
-export default function LeadCreate({ services, contents, stage }: Props) {
+export default function LeadCreate({
+    services,
+    contents,
+    stage,
+    after,
+}: Props) {
     return (
         <LeadForm
             lead={null}
             services={services}
             contents={contents}
             initialStage={stage}
+            after={after}
         />
     );
 }
 
-LeadCreate.layout = ({ stage }: Props) => ({
+LeadCreate.layout = ({ stage, after }: Props) => ({
     breadcrumbs:
-        stage === 'client'
+        after === 'surat'
             ? [
-                  { title: 'Client', href: clients() },
+                  { title: 'Surat', href: letters() },
+                  { title: 'Buat surat', href: lettersCreate() },
                   {
                       title: 'Tambah Client',
-                      href: leadsCreate({ query: { tahap: 'client' } }),
+                      href: leadsCreate({ query: { lanjut: 'surat' } }),
                   },
               ]
-            : [
-                  { title: 'Leads', href: leads() },
-                  { title: 'Tambah Lead', href: leadsCreate() },
-              ],
+            : stage === 'client'
+              ? [
+                    { title: 'Client', href: clients() },
+                    {
+                        title: 'Tambah Client',
+                        href: leadsCreate({ query: { tahap: 'client' } }),
+                    },
+                ]
+              : [
+                    { title: 'Leads', href: leads() },
+                    { title: 'Tambah Lead', href: leadsCreate() },
+                ],
 });

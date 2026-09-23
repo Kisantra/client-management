@@ -172,6 +172,8 @@ class ActivityController extends Controller
             'catatan' => 'Catatan lead',
             'follow-up' => 'Follow-up',
             'tanggal-penting' => 'Tanggal penting',
+            'surat' => 'Surat',
+            'template-surat' => 'Template surat',
             'anggota' => 'Anggota',
         ];
 

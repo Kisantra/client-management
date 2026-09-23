@@ -32,13 +32,16 @@ class ReportController extends Controller
         return Inertia::render('report', [
             'period' => $report->toArray(),
             'previous' => $report->previous()->toArray(),
+            /* Each step is the query that opens the neighbouring period, so a
+               custom range steps by its own length with no special case on
+               the page. */
             'steps' => [
-                'back' => $report->shifted(-1)->start->toDateString(),
+                'back' => $report->shifted(-1)->query(),
                 /* Null at the newest period there is: a report of a month that
                    has not started counts nothing and reads as a fault. */
                 'forward' => $report->isOpen()
                     ? null
-                    : $report->shifted(1)->start->toDateString(),
+                    : $report->shifted(1)->query(),
             ],
             'summary' => $report->summary(),
             'channels' => $report->byChannel(),
@@ -94,6 +97,13 @@ class ReportController extends Controller
 
     private function asked(Request $request): Report
     {
+        if ($request->query('periode') === Report::CUSTOM) {
+            return Report::between(
+                $request->query('dari') !== null ? (string) $request->query('dari') : null,
+                $request->query('sampai') !== null ? (string) $request->query('sampai') : null,
+            );
+        }
+
         return Report::make(
             (string) $request->query('periode', Report::MONTHLY),
             $request->query('pada') !== null ? (string) $request->query('pada') : null,

@@ -27,6 +27,10 @@ class DatabaseSeeder extends Seeder
            the content calendar has to plan around. */
         $this->call(KeyDateSeeder::class);
 
+        /* The letters the office sends, in its own words. Only what is
+           missing is written, so an edited template is never overwritten. */
+        $this->call(LetterTemplateSeeder::class);
+
         // $this->call(LeadSeeder::class);
         // $this->call(ContentSeeder::class);
         // $this->call(ContentIdeaSeeder::class);

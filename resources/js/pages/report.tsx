@@ -16,6 +16,7 @@ import type { PatternsData } from '@/components/report/content-patterns';
 import { ContentProduction } from '@/components/report/content-production';
 import { LeadSources } from '@/components/report/lead-sources';
 import type { LeadSource } from '@/components/report/lead-sources';
+import { RangePicker } from '@/components/report/range-picker';
 import { nf } from '@/components/report/report-section';
 import { TopContent } from '@/components/report/top-content';
 import type { TopContentData } from '@/components/report/top-content';
@@ -31,13 +32,17 @@ import { report as reportIndex } from '@/routes';
 import { exportMethod as reportExport } from '@/routes/report';
 
 type Period = {
-    kind: 'bulan' | 'minggu';
+    kind: 'bulan' | 'minggu' | 'khusus';
     label: string;
     start: string;
     end: string;
+    /** Both ends counted. */
+    days: number;
     slug: string;
     /** True while the period has not finished, so figures are still partial. */
     open: boolean;
+    /** The address query that opens this exact period again. */
+    query: Record<string, string>;
 };
 
 type Figure = {
@@ -62,7 +67,11 @@ type ChannelRow = {
 type Props = {
     period: Period;
     previous: Period;
-    steps: { back: string; forward: string | null };
+    /** The queries that open the neighbouring periods. */
+    steps: {
+        back: Record<string, string>;
+        forward: Record<string, string> | null;
+    };
     summary: Figure[];
     channels: ChannelRow[];
     owners: {
@@ -78,7 +87,7 @@ type Props = {
 };
 
 /**
- * The month, or the week, written up.
+ * The month, the week, or any two dates, written up.
  *
  * Built to be printed as much as read. The thing a team is actually asked for
  * is a PDF, and the browser already makes one, so the page carries a print
@@ -101,14 +110,9 @@ export default function ReportPage({
     patterns,
     generatedAt,
 }: Props) {
-    const go = (next: { periode?: string; pada?: string }) =>
+    const go = (query: Record<string, string>) =>
         router.get(
-            reportIndex.url({
-                query: {
-                    periode: next.periode ?? period.kind,
-                    pada: next.pada ?? period.start,
-                },
-            }),
+            reportIndex.url({ query }),
             {},
             { preserveState: true, preserveScroll: true },
         );
@@ -187,7 +191,12 @@ export default function ReportPage({
                                     key={kind}
                                     type="button"
                                     aria-pressed={period.kind === kind}
-                                    onClick={() => go({ periode: kind })}
+                                    onClick={() =>
+                                        go({
+                                            periode: kind,
+                                            pada: period.start,
+                                        })
+                                    }
                                     className={cn(
                                         'rounded-sm px-3 py-1.5 text-[0.8438rem] font-bold capitalize transition-colors',
                                         period.kind === kind
@@ -198,12 +207,20 @@ export default function ReportPage({
                                     {kind === 'bulan' ? 'Bulanan' : 'Mingguan'}
                                 </button>
                             ))}
+                            <RangePicker
+                                active={period.kind === 'khusus'}
+                                from={period.start}
+                                to={period.end}
+                                onApply={(range) =>
+                                    go({ periode: 'khusus', ...range })
+                                }
+                            />
                         </div>
 
                         <div className="flex items-center rounded-md border border-border bg-card shadow-lift">
                             <button
                                 type="button"
-                                onClick={() => go({ pada: steps.back })}
+                                onClick={() => go(steps.back)}
                                 title="Periode sebelumnya"
                                 className="grid size-9 place-items-center rounded-l-md text-muted-foreground transition-colors hover:bg-neutral-soft hover:text-foreground"
                             >
@@ -220,7 +237,7 @@ export default function ReportPage({
                                 type="button"
                                 disabled={steps.forward === null}
                                 onClick={() =>
-                                    steps.forward && go({ pada: steps.forward })
+                                    steps.forward && go(steps.forward)
                                 }
                                 title="Periode berikutnya"
                                 className="grid size-9 place-items-center rounded-r-md text-muted-foreground transition-colors hover:bg-neutral-soft hover:text-foreground disabled:pointer-events-none disabled:opacity-40"
@@ -255,7 +272,9 @@ export default function ReportPage({
                             previous={
                                 period.kind === 'minggu'
                                     ? 'minggu sebelumnya'
-                                    : previous.label
+                                    : period.kind === 'khusus'
+                                      ? `${nf.format(period.days)} hari sebelumnya`
+                                      : previous.label
                             }
                             anchor={at === 0}
                             delay={at * 90}
@@ -288,7 +307,7 @@ export default function ReportPage({
  * it — which a two-word button label never could.
  */
 function ExportMenu({ period }: { period: Period }) {
-    const query = { query: { periode: period.kind, pada: period.start } };
+    const query = { query: period.query };
 
     return (
         <DropdownMenu modal={false}>

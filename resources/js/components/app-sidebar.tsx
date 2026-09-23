@@ -6,6 +6,7 @@ import {
     LayoutGrid,
     FileText,
     History,
+    Mail,
     Settings,
     Users,
     UsersRound,
@@ -25,6 +26,7 @@ import {
     content,
     dashboard,
     leads,
+    letters,
     performance,
     report,
     team,
@@ -34,6 +36,7 @@ import {
     ideas as contentIdeas,
     news as contentNews,
 } from '@/routes/content';
+import { templates as letterTemplates } from '@/routes/letters';
 import { edit as editProfile } from '@/routes/profile';
 import type { NavGroup, SharedProps } from '@/types';
 
@@ -89,6 +92,22 @@ function buildNav(counts: SharedProps['counts']): NavGroup[] {
                     title: 'Performa',
                     href: performance(),
                     icon: ChartNoAxesColumn,
+                },
+                {
+                    title: 'Surat',
+                    href: letters(),
+                    icon: Mail,
+                    // Drafts: what is begun and not yet sent.
+                    badge: counts?.letters ?? 0,
+                    section: '/surat',
+                    children: [
+                        { title: 'Daftar Surat', href: letters() },
+                        {
+                            title: 'Template',
+                            href: letterTemplates(),
+                            section: '/surat/template',
+                        },
+                    ],
                 },
             ],
         },

@@ -5,6 +5,7 @@ namespace App\Http\Middleware;
 use App\Models\Content;
 use App\Models\ContentIdea;
 use App\Models\Lead;
+use App\Models\Letter;
 use App\Models\User;
 use App\Support\ContentPlan;
 use App\Support\Pipeline;
@@ -121,6 +122,8 @@ class HandleInertiaRequests extends Middleware
                 'content' => Content::where('status', '!=', Content::PUBLISHED)->count(),
                 // Written down and still waiting for a date.
                 'ideas' => ContentIdea::whereNull('content_id')->count(),
+                // Letters begun and not yet issued.
+                'letters' => Letter::query()->where('status', Letter::DRAFT)->count(),
                 // Everyone the work knows: accounts and the names it carries.
                 'team' => count($team()),
             ] : null,

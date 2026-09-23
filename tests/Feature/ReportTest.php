@@ -318,6 +318,13 @@ it('says which kinds of content earn more than their account usually does', func
             ->where('patterns.all.dimensions.4.groups.0.label', 'Senin')
             ->where('patterns.all.dimensions.4.groups.1.label', 'Kamis')
             ->where('patterns.all.dimensions.4.groups.2.label', 'Sabtu')
+            // Posting hours in two-hour slots, also in Jakarta time: 03:00 UTC
+            // is ten in the morning, 20:00 UTC is three the next morning.
+            ->where('patterns.all.dimensions.5.key', 'hour')
+            ->where('patterns.all.dimensions.5.groups.0.label', '02.00–04.00')
+            ->where('patterns.all.dimensions.5.groups.0.posts', 1)
+            ->where('patterns.all.dimensions.5.groups.1.label', '10.00–12.00')
+            ->where('patterns.all.dimensions.5.groups.1.posts', 8)
             // The period scope reads September alone.
             ->where('patterns.period.posts', 1)
             ->where('patterns.period.dimensions.0.groups.0.label', 'Reel')
@@ -345,7 +352,7 @@ it('says when a period has not finished counting', function () {
     $this->get(route('report', ['periode' => 'bulan', 'pada' => '2026-08-09']))
         ->assertInertia(fn ($page) => $page
             ->where('period.open', false)
-            ->where('steps.forward', '2026-09-01')
+            ->where('steps.forward.pada', '2026-09-01')
         );
 });
 
@@ -393,4 +400,56 @@ it('says so rather than sending an empty file', function () {
         ->streamedContent();
 
     expect($body)->toContain('Tidak ada data pada periode ini');
+});
+
+/*
+ | A range of any length is compared with as many days immediately before it,
+ | and steps by its own length — the only neighbour an arbitrary range has
+ | that is a fair match.
+ */
+it('reports a custom range against the same number of days before it', function () {
+    arrived(['entered_at' => '2026-08-05']);
+    arrived(['entered_at' => '2026-08-20']);
+    arrived(['entered_at' => '2026-08-21']); // the day after: outside
+    arrived(['entered_at' => '2026-07-25']); // inside the 20 days before
+
+    $this->get(route('report', ['periode' => 'khusus', 'dari' => '2026-08-01', 'sampai' => '2026-08-20']))
+        ->assertOk()
+        ->assertInertia(fn ($page) => $page
+            ->where('period.kind', 'khusus')
+            ->where('period.label', '1–20 Agustus 2026')
+            ->where('period.days', 20)
+            ->where('period.query', ['periode' => 'khusus', 'dari' => '2026-08-01', 'sampai' => '2026-08-20'])
+            ->where('previous.label', '12–31 Juli 2026')
+            ->where('summary.0.value', 2)
+            ->where('summary.0.was', 1)
+            ->has('summary.0.series', 6)
+            ->where('steps.back', ['periode' => 'khusus', 'dari' => '2026-07-12', 'sampai' => '2026-07-31'])
+            ->where('steps.forward', ['periode' => 'khusus', 'dari' => '2026-08-21', 'sampai' => '2026-09-09'])
+        );
+});
+
+it('names a custom range across a year, and exports it under its dates', function () {
+    expect(Report::between('2025-12-28', '2026-01-05')->label())->toBe('28 Desember 2025–5 Januari 2026')
+        ->and(Report::between('2026-08-17', '2026-08-17')->label())->toBe('17 Agustus 2026')
+        ->and(Report::between('2026-08-17', '2026-08-17')->days())->toBe(1);
+
+    $this->get(route('report.export', ['part' => 'lead', 'periode' => 'khusus', 'dari' => '2026-08-01', 'sampai' => '2026-08-20']))
+        ->assertOk()
+        ->assertDownload('kisantra-lead-2026-08-01-sd-2026-08-20.csv');
+});
+
+it('falls back to the month when a custom range will not read', function () {
+    foreach ([
+        ['dari' => '2026-08-20', 'sampai' => '2026-08-01'], // backwards
+        ['dari' => 'kemarin', 'sampai' => '2026-08-01'],     // not a date
+        ['dari' => '2026-08-01'],                            // half a range
+    ] as $query) {
+        $this->get(route('report', ['periode' => 'khusus', ...$query]))
+            ->assertOk()
+            ->assertInertia(fn ($page) => $page
+                ->where('period.kind', 'bulan')
+                ->where('period.label', 'September 2026')
+            );
+    }
 });

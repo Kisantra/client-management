@@ -3,6 +3,7 @@ import {
     ArrowRight,
     CalendarDays,
     Clapperboard,
+    Clock,
     Link2,
     Shapes,
     Sparkles,
@@ -27,7 +28,8 @@ import { content } from '@/routes';
 
 type Platform = 'instagram' | 'tiktok';
 
-type DimensionKey = 'format' | 'duration' | 'type' | 'pillar' | 'weekday';
+type DimensionKey =
+    'format' | 'duration' | 'type' | 'pillar' | 'weekday' | 'hour';
 
 type Example = {
     platform: Platform;
@@ -85,6 +87,7 @@ const ICON: Record<DimensionKey, LucideIcon> = {
     type: Shapes,
     pillar: Tag,
     weekday: CalendarDays,
+    hour: Clock,
 };
 
 /** How the headline names the dimension: "paling tinggi di antara …". */
@@ -94,6 +97,13 @@ const NOUN: Record<DimensionKey, string> = {
     type: 'jenis konten',
     pillar: 'pillar',
     weekday: 'hari tayang',
+    hour: 'jam tayang (WIB)',
+};
+
+/** What the headline puts before a group's name, where the name alone reads
+    oddly as the subject: "10.00–12.00 mendapat…" wants its "Pukul". */
+const SUBJECT: Partial<Record<DimensionKey, string>> = {
+    hour: 'Unggahan pukul ',
 };
 
 /** Within a twentieth of usual reads as usual, not as a win or a loss. */
@@ -103,9 +113,9 @@ const isBelow = (lift: number) => lift <= 0.95;
 /**
  * What kind of content has earned more than usual.
  *
- * One question — which kinds work — asked of five categories, because the
- * team decides all five when it plans a piece: its format, its length, its
- * type and pillar in the calendar, and the day it goes out. Every group is a
+ * One question — which kinds work — asked of six categories, because the
+ * team decides all six when it plans a piece: its format, its length, its
+ * type and pillar in the calendar, and the day and the hour it goes out. Every group is a
  * bar against a single line marked "biasanya", so the whole card reads with
  * one rule: past the line did better than an ordinary post, short of it did
  * worse.
@@ -156,7 +166,7 @@ export function ContentPatterns({ data }: { data: PatternsData }) {
         return (
             <ReportSection
                 title="Konten seperti apa yang berhasil"
-                description="Format, durasi, jenis, pillar, dan hari tayang yang selama ini mendapat interaksi di atas biasanya."
+                description="Format, durasi, jenis, pillar, hari, dan jam tayang yang selama ini mendapat interaksi di atas biasanya."
             >
                 <ReportEmpty
                     compact
@@ -205,7 +215,7 @@ export function ContentPatterns({ data }: { data: PatternsData }) {
                 />
             }
         >
-            {/* The five ways to slice the posts. Scrolls sideways on a phone
+            {/* The six ways to slice the posts. Scrolls sideways on a phone
                 rather than wrapping into a second row of tabs. */}
             <div className="scroll-slim -mx-1 overflow-x-auto px-1 pb-1">
                 <div className="flex w-max gap-1.5">
@@ -284,6 +294,7 @@ export function ContentPatterns({ data }: { data: PatternsData }) {
                         <Headline
                             leader={leader}
                             noun={NOUN[dimension.key]}
+                            subject={SUBJECT[dimension.key] ?? ''}
                             enough={data.enough}
                         />
 
@@ -392,10 +403,12 @@ export function ContentPatterns({ data }: { data: PatternsData }) {
 function Headline({
     leader,
     noun,
+    subject,
     enough,
 }: {
     leader: Group | null;
     noun: string;
+    subject: string;
     enough: number;
 }) {
     if (!leader) {
@@ -411,15 +424,22 @@ function Headline({
         return (
             <p className="text-sm leading-relaxed">
                 Belum ada {noun} yang jelas di atas biasanya. Yang tertinggi{' '}
-                <b>{leader.label}</b>, di{' '}
-                <b data-numeric>{times(leader.lift)}</b>.
+                <b>
+                    {subject.toLowerCase()}
+                    {leader.label}
+                </b>
+                , di <b data-numeric>{times(leader.lift)}</b>.
             </p>
         );
     }
 
     return (
         <p className="text-sm leading-relaxed">
-            <b>{leader.label}</b> mendapat{' '}
+            <b>
+                {subject}
+                {leader.label}
+            </b>{' '}
+            mendapat{' '}
             <b
                 className="rounded-md bg-primary-soft px-1.5 py-0.5 text-primary-deep"
                 data-numeric

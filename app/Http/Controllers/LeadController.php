@@ -91,6 +91,9 @@ class LeadController extends Controller
             'contents' => $this->contents(),
             // The Client page opens the form on the last stage: a client that predates the tool.
             'stage' => in_array($stage, Pipeline::keys(), true) ? $stage : 'lead',
+            /* Opened from the letter form because the client was not on the
+               books yet: saving goes back there with the new client chosen. */
+            'after' => $request->query('lanjut') === 'surat' ? 'surat' : null,
         ]);
     }
 
@@ -135,6 +138,10 @@ class LeadController extends Controller
             'Masuk ke tahap '.Pipeline::label($lead->stage).'.',
         );
 
+        if ($request->input('after') === 'surat') {
+            return to_route('letters.create', ['lead' => $lead->id]);
+        }
+
         return to_route('leads.show', $lead);
     }
 
@@ -175,6 +182,15 @@ class LeadController extends Controller
                 'note' => $followUp->note,
                 'done' => $followUp->done,
             ])->all(),
+            /* What has been written to this lead on the letterhead, newest
+               first, so the offer sent last week is one click from the record. */
+            'letters' => $lead->letters()
+                ->with(['template', 'lead', 'creator'])
+                ->orderByDesc('letter_date')
+                ->orderByDesc('id')
+                ->get()
+                ->map->toRow()
+                ->all(),
         ]);
     }
 
