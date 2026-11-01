@@ -12,6 +12,7 @@
         "php": "^8.3",
         "dompdf/dompdf": "^3.1",
         "inertiajs/inertia-laravel": "^3.0",
+        "kisantra/watchpost-laravel": "^1.1",
         "laravel/chisel": "^0.1.0",
         "laravel/fortify": "^1.37.2",
         "laravel/framework": "^13.17",
@@ -115,5 +116,10 @@
         }
     },
     "minimum-stability": "stable",
-    "prefer-stable": true
+    "prefer-stable": true,
+    "repositories": [{
+        "name": "watchpost",
+        "type": "vcs",
+        "url": "https://github.com/Kisantra/watchpost-laravel.git"
+    }]
 }
