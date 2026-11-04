@@ -174,6 +174,7 @@ class ActivityController extends Controller
             'tanggal-penting' => 'Tanggal penting',
             'surat' => 'Surat',
             'template-surat' => 'Template surat',
+            'penanda-tangan' => 'Penanda tangan surat',
             'anggota' => 'Anggota',
         ];
 

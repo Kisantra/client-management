@@ -13,19 +13,24 @@ import {
 } from 'lucide-react';
 import { useEffect, useRef, useState } from 'react';
 import { Field } from '@/components/leads/form-field';
+import { ChecklistEditor } from '@/components/letters/checklist-editor';
 import { ConfirmDialog } from '@/components/letters/confirm-dialog';
 import { FieldEditor } from '@/components/letters/field-editor';
 import { Paper } from '@/components/letters/paper';
+import { ProjectPicker } from '@/components/letters/project-picker';
+import { SignerSlots } from '@/components/letters/signer-slots';
 import { StatusPill } from '@/components/letters/status-pill';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { longDate, rupiah } from '@/data/leads';
 import type {
+    DocumentTypeGroup,
     FieldValue,
     LetterDetail,
     LetterField,
     LetterValues,
     Preview,
+    SignerOption,
 } from '@/data/letters';
 import { cn } from '@/lib/utils';
 import { letters } from '@/routes';
@@ -48,15 +53,22 @@ type Props = {
     /** Labels of required blanks still empty; the letter cannot issue until none. */
     missing: string[];
     total: number;
+    /** Whether the template has a fee table, so a total is worth showing. */
+    hasItems: boolean;
     nextNumber: string;
+    signers: SignerOption[];
+    /** Common projects to offer; anything else may be typed. */
+    projects: string[];
+    documentTypes: DocumentTypeGroup[];
 };
 
 type Draft = {
     subject: string;
     recipient: string;
+    project: string;
     letter_date: string;
-    signer_name: string;
-    signer_title: string;
+    /** Chosen signer per template slot, by index. */
+    signers: (number | null)[];
     values: LetterValues;
 };
 
@@ -79,16 +91,20 @@ export default function LetterEditPage({
     preview,
     missing,
     total,
+    hasItems,
     nextNumber,
+    signers,
+    projects,
+    documentTypes,
 }: Props) {
     const editable = letter.status === 'draft';
 
     const [draft, setDraft] = useState<Draft>(() => ({
         subject: letter.subject,
-        recipient: letter.recipient,
+        recipient: letter.recipient ?? '',
+        project: letter.project ?? '',
         letter_date: letter.date,
-        signer_name: letter.signerName,
-        signer_title: letter.signerTitle,
+        signers: letter.signers.map((slot) => slot.signerId),
         values: { ...letter.values },
     }));
     const [save, setSave] = useState<SaveState>('idle');
@@ -398,8 +414,9 @@ export default function LetterEditPage({
                                 <Field
                                     id="recipient"
                                     label="Yth."
+                                    optional
                                     error={errors.recipient}
-                                    hint="Boleh memakai {{klien}}, {{klien_kapital}}, atau {{pic}}."
+                                    hint="Boleh memakai {{klien}}, {{pic}}, atau isian surat. Kosongkan untuk berita acara: blok tujuan tidak dicetak."
                                     className="sm:col-span-2"
                                 >
                                     <Input
@@ -418,9 +435,11 @@ export default function LetterEditPage({
                                     label="Tanggal surat"
                                     error={errors.letter_date}
                                     hint={
-                                        editable && !letter.number
-                                            ? 'Bulan dan tahunnya masuk ke nomor.'
-                                            : undefined
+                                        !editable
+                                            ? undefined
+                                            : letter.number
+                                              ? 'Nomornya sudah memuat bulan ini; tanggal hanya bisa digeser di dalam bulan itu.'
+                                              : 'Bulan dan tahunnya masuk ke nomor.'
                                     }
                                 >
                                     <Input
@@ -436,40 +455,50 @@ export default function LetterEditPage({
                                     />
                                 </Field>
                                 <Field
-                                    id="signer_name"
-                                    label="Ditandatangani oleh"
-                                    error={errors.signer_name}
-                                >
-                                    <Input
-                                        id="signer_name"
-                                        value={draft.signer_name}
-                                        onChange={(event) =>
-                                            change({
-                                                signer_name: event.target.value,
-                                            })
-                                        }
-                                        disabled={!editable}
-                                    />
-                                </Field>
-                                <Field
-                                    id="signer_title"
-                                    label="Jabatan"
-                                    error={errors.signer_title}
+                                    id="project"
+                                    label="Proyek"
+                                    optional
+                                    error={errors.project}
+                                    hint="Mengisi {{proyek}} di redaksi."
                                     className="sm:col-span-2"
                                 >
-                                    <Input
-                                        id="signer_title"
-                                        value={draft.signer_title}
-                                        onChange={(event) =>
-                                            change({
-                                                signer_title:
-                                                    event.target.value,
-                                            })
+                                    <ProjectPicker
+                                        id="project"
+                                        value={draft.project}
+                                        suggestions={projects}
+                                        onChange={(project) =>
+                                            change({ project })
                                         }
                                         disabled={!editable}
                                     />
                                 </Field>
                             </div>
+                        </section>
+
+                        <section className="rounded-xl border border-border bg-card p-5 shadow-lift">
+                            <header className="mb-4 flex items-center justify-between gap-3">
+                                <h2 className="text-base font-extrabold tracking-[-0.02em]">
+                                    Penanda tangan
+                                </h2>
+                                <span className="shrink-0 rounded-full bg-neutral-soft px-2.5 py-1 text-xs font-semibold text-muted-foreground">
+                                    <span data-numeric>
+                                        {draft.signers.filter(Boolean).length}
+                                    </span>{' '}
+                                    dari{' '}
+                                    <span data-numeric>
+                                        {letter.signers.length}
+                                    </span>{' '}
+                                    dipilih
+                                </span>
+                            </header>
+                            <SignerSlots
+                                slots={letter.signers}
+                                signers={signers}
+                                value={draft.signers}
+                                onChange={(next) => change({ signers: next })}
+                                errors={errors}
+                                disabled={!editable}
+                            />
                         </section>
 
                         <section className="rounded-xl border border-border bg-card p-5 shadow-lift">
@@ -484,30 +513,58 @@ export default function LetterEditPage({
                             </header>
 
                             <div className="flex flex-col gap-5">
-                                {fields.map((field) => (
-                                    <FieldEditor
-                                        key={field.key}
-                                        field={field}
-                                        value={draft.values[field.key]}
-                                        onChange={(value) =>
-                                            changeValue(field.key, value)
-                                        }
-                                        error={errors[`values.${field.key}`]}
-                                        disabled={!editable}
-                                    />
-                                ))}
+                                {fields.map((field) =>
+                                    field.type === 'checklist' ? (
+                                        <ChecklistEditor
+                                            key={field.key}
+                                            letterId={letter.id}
+                                            field={field}
+                                            items={letter.documents.filter(
+                                                (doc) =>
+                                                    doc.field === field.key,
+                                            )}
+                                            groups={documentTypes}
+                                            editable={editable}
+                                            trackable={
+                                                letter.status === 'terbit'
+                                            }
+                                            asAttachment={
+                                                letter.template
+                                                    .checklistAsAttachment
+                                            }
+                                            beforeVisit={(go) => flush(go)}
+                                        />
+                                    ) : (
+                                        <FieldEditor
+                                            key={field.key}
+                                            field={field}
+                                            value={draft.values[field.key]}
+                                            onChange={(value) =>
+                                                changeValue(field.key, value)
+                                            }
+                                            error={
+                                                errors[`values.${field.key}`]
+                                            }
+                                            disabled={!editable}
+                                        />
+                                    ),
+                                )}
                             </div>
 
                             <div className="mt-5 flex flex-wrap items-center justify-between gap-2 border-t border-border pt-4 text-xs text-muted-foreground">
-                                <span>
-                                    Total biaya{' '}
-                                    <span
-                                        className="font-extrabold text-foreground"
-                                        data-numeric
-                                    >
-                                        {rupiah.format(total)}
+                                {hasItems ? (
+                                    <span>
+                                        Total biaya{' '}
+                                        <span
+                                            className="font-extrabold text-foreground"
+                                            data-numeric
+                                        >
+                                            {rupiah.format(total)}
+                                        </span>
                                     </span>
-                                </span>
+                                ) : (
+                                    <span />
+                                )}
                                 {editable ? (
                                     missing.length > 0 ? (
                                         <span className="font-semibold text-destructive">

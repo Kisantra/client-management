@@ -31,14 +31,13 @@ return [
     ],
 
     /*
-    | Who signs, unless a letter says otherwise. Each letter copies these at
-    | creation so a change here never rewrites what already went out.
+    | The first signer on a fresh install. Signers and their signature images
+    | are kept on the Surat → Pengaturan page from then on; this only seeds
+    | the list, so a change here rewrites nothing already set up there.
     */
     'signer' => [
         'name' => env('LETTER_SIGNER_NAME', 'Iqal Azhari'),
         'title' => env('LETTER_SIGNER_TITLE', 'Direktur'),
-        // Optional image printed above the name, relative to /public. Null leaves the space blank.
-        'image' => env('LETTER_SIGNER_IMAGE'),
     ],
 
     /*
@@ -65,7 +64,9 @@ return [
     /*
     | PEN-011/KSN-MS/VIII/2026. Tokens: {prefix} from the template, {seq} the
     | running number, {code} the office code, {inisial} the client's initials,
-    | {roman} the month, {year}. The sequence restarts every year, per prefix.
+    | {roman} the month, {year}. The sequence restarts every year, per prefix:
+    | S, BA and PEN each count on their own. Where a counter starts can be set
+    | on the Pengaturan page, for an office continuing a paper register.
     */
     'number' => [
         'format' => env('LETTER_NUMBER_FORMAT', '{prefix}-{seq}/{code}-{inisial}/{roman}/{year}'),

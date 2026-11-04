@@ -19,8 +19,8 @@ use Illuminate\Support\Str;
 /**
  * The moment a draft becomes a letter, and the way back.
  *
- * Issuing draws the number and freezes the words, so the PDF downloaded
- * tomorrow is the one sent today. Pulling it back reopens the words for a
+ * Issuing draws the number and freezes the words and the signatures, so
+ * the PDF downloaded tomorrow is the one sent today. Pulling it back reopens the words for a
  * correction but keeps the number: a number once given is on the register,
  * and the corrected letter goes out under it.
  */
@@ -47,6 +47,8 @@ class LetterIssueController extends Controller
             LetterNumber::assign($letter);
 
             $letter->forceFill([
+                // Name, title and signature image as they stand now, kept with the letter.
+                'signers' => $letter->frozenSigners(),
                 'rendered_html' => LetterRenderer::body($letter),
                 'status' => Letter::ISSUED,
                 'issued_at' => now(),

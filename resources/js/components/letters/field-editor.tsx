@@ -9,6 +9,7 @@ import {
     SelectValue,
 } from '@/components/ui/select';
 import { Textarea } from '@/components/ui/textarea';
+import { thousands } from '@/data/letters';
 import type { FieldValue, ItemSection, LetterField } from '@/data/letters';
 
 /**
@@ -36,7 +37,10 @@ export function FieldEditor({
     labelOverride?: string;
 }) {
     const id = `${idPrefix}-${field.key}`;
-    const text = typeof value === 'string' ? value : '';
+    const text =
+        typeof value === 'string' || typeof value === 'number'
+            ? String(value)
+            : '';
 
     return (
         <Field
@@ -79,7 +83,9 @@ export function FieldEditor({
                     disabled={disabled}
                     rows={4}
                 />
-            ) : field.type === 'list' ? (
+            ) : field.type === 'list' || field.type === 'checklist' ? (
+                /* A checklist is edited row by row on the letter; here, in
+                   the template, its default is one document per line. */
                 <Textarea
                     id={id}
                     value={text}
@@ -88,6 +94,39 @@ export function FieldEditor({
                     disabled={disabled}
                     rows={4}
                     className="font-mono"
+                />
+            ) : field.type === 'currency' ? (
+                <div className="relative">
+                    <span
+                        className="pointer-events-none absolute top-1/2 left-3 -translate-y-1/2 text-sm text-muted-foreground"
+                        aria-hidden
+                    >
+                        Rp
+                    </span>
+                    <Input
+                        id={id}
+                        inputMode="numeric"
+                        value={thousands(text)}
+                        onChange={(event) =>
+                            onChange(event.target.value.replace(/\D/g, ''))
+                        }
+                        placeholder={field.placeholder ?? undefined}
+                        disabled={disabled}
+                        className="pl-9"
+                        data-numeric
+                    />
+                </div>
+            ) : field.type === 'number' ? (
+                <Input
+                    id={id}
+                    inputMode="numeric"
+                    value={text}
+                    onChange={(event) =>
+                        onChange(event.target.value.replace(/[^\d.,]/g, ''))
+                    }
+                    placeholder={field.placeholder ?? undefined}
+                    disabled={disabled}
+                    data-numeric
                 />
             ) : field.type === 'date' ? (
                 <Input

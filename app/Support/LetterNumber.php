@@ -51,10 +51,7 @@ class LetterNumber
                 $counter = LetterNumberCounter::create([
                     'prefix' => $prefix,
                     'year' => $year,
-                    'last_sequence' => (int) Letter::query()
-                        ->where('year', $year)
-                        ->whereHas('template', fn ($q) => $q->where('number_prefix', $prefix))
-                        ->max('sequence'),
+                    'last_sequence' => self::highestIssued($prefix, $year),
                 ]);
             }
 
@@ -69,6 +66,19 @@ class LetterNumber
         });
     }
 
+    /**
+     * The highest sequence already printed on a letter of this prefix and
+     * year. A counter may never be wound below it, or two letters would
+     * carry the same number.
+     */
+    public static function highestIssued(string $prefix, int $year): int
+    {
+        return (int) Letter::query()
+            ->where('year', $year)
+            ->whereHas('template', fn ($q) => $q->where('number_prefix', $prefix))
+            ->max('sequence');
+    }
+
     /** What the next issue of this prefix on this date would be numbered, without drawing it. */
     public static function preview(string $prefix, CarbonInterface $date, string $company): string
     {
@@ -76,6 +86,8 @@ class LetterNumber
             ->where('prefix', $prefix)
             ->where('year', $date->year)
             ->value('last_sequence');
+
+        $last ??= self::highestIssued($prefix, $date->year);
 
         return self::format($prefix, ((int) $last) + 1, $date, self::initials($company));
     }

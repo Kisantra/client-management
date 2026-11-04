@@ -3,9 +3,12 @@
 namespace App\Support;
 
 use App\Models\Letter;
+use App\Models\LetterRequestedDocument;
+use App\Models\LetterSigner;
 use App\Models\LetterTemplate;
 use Carbon\CarbonInterface;
 use Illuminate\Support\Carbon;
+use Illuminate\Support\Collection;
 use Illuminate\Support\Str;
 
 /**
@@ -24,36 +27,58 @@ class LetterRenderer
     ];
 
     /**
-     * The whole document for the screen or the PDF: head, body, signature.
+     * The whole document for the screen or the PDF: head, body, signatures,
+     * and the attachment pages a document list prints on.
      *
      * An issued letter renders from the words it went out with; a draft
      * renders live from its template and values.
      */
     public static function document(Letter $letter, bool $forPdf = false): string
     {
-        $letter->loadMissing(['template', 'lead']);
+        $letter->loadMissing(['template', 'lead', 'requestedDocuments.type']);
 
         $body = $letter->isDraft() || $letter->rendered_html === null
             ? self::body($letter)
             : $letter->rendered_html;
 
         $company = config('letter.company');
-        $signer = config('letter.signer');
-        $image = $signer['image'] ?? null;
-        $imageSrc = null;
+        $template = $letter->template;
+        $values = $letter->values ?? [];
+        $recipient = trim((string) $letter->recipient);
 
-        if ($image && is_file(public_path($image))) {
-            $imageSrc = $forPdf ? public_path($image) : '/'.ltrim($image, '/');
-        }
+        $signatures = collect($letter->signatureBlocks())
+            ->map(fn (array $block) => [
+                ...$block,
+                'src' => $forPdf ? LetterSigner::fileFor($block['image']) : LetterSigner::dataUriFor($block['image']),
+            ])
+            ->all();
+
+        /* A berita acara the client also signs names its representative in
+           a pihak_klien field; it prints as a column beside the office's. */
+        $fields = $template->fieldDefinitions();
+        $counterSign = isset($fields['pihak_klien']) && filled($values['pihak_klien'] ?? null)
+            ? ['for' => $letter->clientName(), 'name' => (string) $values['pihak_klien']]
+            : null;
+
+        $attachments = $template->checklist_as_attachment
+            ? collect($template->checklistKeys())
+                ->map(fn (string $key) => ['label' => $fields[$key]['label'], 'items' => $letter->checklist($key)])
+                ->filter(fn (array $attachment) => $attachment['items']->isNotEmpty())
+                ->values()
+                ->all()
+            : [];
 
         return view('letters.document', [
             'letter' => $letter,
             'forPdf' => $forPdf,
             'body' => $body,
             'dateLine' => ($company['city'] ? $company['city'].', ' : '').self::date($letter->letter_date),
-            'recipient' => self::interpolate(e($letter->recipient), self::builtins($letter)),
+            'longDate' => self::date($letter->letter_date),
+            'recipient' => $recipient === '' ? null : self::interpolate(e($recipient), self::placeholders($letter)),
             'legalName' => $company['legal_name'] ?: $company['name'],
-            'signatureSrc' => $imageSrc,
+            'signatures' => $signatures,
+            'counterSign' => $counterSign,
+            'attachments' => $attachments,
         ])->render();
     }
 
@@ -68,16 +93,12 @@ class LetterRenderer
      */
     public static function body(Letter $letter): string
     {
-        $letter->loadMissing(['template', 'lead']);
+        $letter->loadMissing(['template', 'lead', 'requestedDocuments']);
 
         $template = $letter->template;
         $fields = $template->fieldDefinitions();
-        $values = $letter->values ?? [];
-        $placeholders = self::builtins($letter);
-
-        foreach ($fields as $key => $field) {
-            $placeholders[$key] = self::value($field, $values[$key] ?? null, $placeholders, $fields, $values);
-        }
+        $values = self::values($letter);
+        $placeholders = self::placeholders($letter);
 
         $html = '';
 
@@ -96,11 +117,16 @@ class LetterRenderer
             if (preg_match('/^\{\{\s*([a-z0-9_]+)\s*\}\}$/i', $paragraph, $match) && isset($fields[$match[1]])) {
                 $field = $fields[$match[1]];
 
+                // Printed on its own attachment page instead.
+                if ($field['type'] === 'checklist' && $template->checklist_as_attachment) {
+                    continue;
+                }
+
                 if (self::blank($field, $values[$match[1]] ?? null) && ! $field['required']) {
                     continue;
                 }
 
-                if (in_array($field['type'], ['list', 'items'], true)) {
+                if (in_array($field['type'], ['list', 'items', 'checklist'], true)) {
                     $html .= $placeholders[$match[1]];
 
                     continue;
@@ -130,13 +156,22 @@ class LetterRenderer
      */
     public static function missing(Letter $letter): array
     {
-        $values = $letter->values ?? [];
+        $letter->loadMissing(['template', 'requestedDocuments']);
 
-        return collect($letter->template->fieldDefinitions())
+        $template = $letter->template;
+        $values = self::values($letter);
+
+        $fields = collect($template->fieldDefinitions())
             ->filter(fn (array $field) => $field['required'] && self::blank($field, $values[$field['key']] ?? null))
-            ->pluck('label')
-            ->values()
-            ->all();
+            ->pluck('label');
+
+        $signers = collect($letter->signatureBlocks())
+            ->filter(fn (array $block) => blank($block['name']))
+            ->map(fn (array $block) => 'Penanda tangan '.$block['label']);
+
+        $project = $template->uses('proyek') && blank($letter->project) ? ['Proyek'] : [];
+
+        return $fields->merge($project)->merge($signers)->values()->all();
     }
 
     /** The sum of every row in every items field, in rupiah. */
@@ -168,6 +203,42 @@ class LetterRenderer
     }
 
     /**
+     * Every placeholder a letter can print, filled: the built-ins and the
+     * template's own fields, escaped and ready to drop into the page.
+     *
+     * @return array<string, string>
+     */
+    private static function placeholders(Letter $letter): array
+    {
+        $fields = $letter->template->fieldDefinitions();
+        $values = self::values($letter);
+        $placeholders = self::builtins($letter);
+
+        foreach ($fields as $key => $field) {
+            $placeholders[$key] = self::value($field, $values[$key] ?? null, $placeholders, $fields, $values);
+        }
+
+        return $placeholders;
+    }
+
+    /**
+     * The letter's values with each checklist field standing for its rows,
+     * so a checklist is read and blank-checked the way any field is.
+     *
+     * @return array<string, mixed>
+     */
+    private static function values(Letter $letter): array
+    {
+        $values = $letter->values ?? [];
+
+        foreach ($letter->template->checklistKeys() as $key) {
+            $values[$key] = $letter->checklist($key);
+        }
+
+        return $values;
+    }
+
+    /**
      * What every template can print without declaring a field, escaped.
      *
      * @return array<string, string>
@@ -183,6 +254,7 @@ class LetterRenderer
             'klien_kapital' => e(mb_strtoupper($letter->clientName())),
             'pic' => e($lead->pic),
             'layanan_lead' => e($lead->service),
+            'proyek' => filled($letter->project) ? e($letter->project) : '<span class="ltr-blank">…</span>',
             'nomor' => e($letter->number ?? '…'),
             'tanggal_surat' => e(self::date($letter->letter_date)),
             'perusahaan' => e($company['name']),
@@ -214,6 +286,9 @@ class LetterRenderer
             'select' => e($field['options'][$value] ?? (string) $value),
             'list' => self::list($field, (string) $value, $placeholders),
             'items' => self::items($field, (array) $value, $fields, $values, $placeholders),
+            'checklist' => self::checklist($value),
+            'currency' => e(self::rupiah(self::amount($value))),
+            'number' => e(number_format((float) str_replace(',', '.', (string) preg_replace('/[^\d,]/', '', (string) $value)), 0, ',', '.')),
             'textarea' => nl2br(self::inline((string) $value, $placeholders)),
             default => self::inline((string) $value, $placeholders),
         };
@@ -253,6 +328,18 @@ class LetterRenderer
         return '<'.$tag.'>'.collect($items)
             ->map(fn ($line) => '<li>'.self::inline($line, $placeholders).'</li>')
             ->join('').'</'.$tag.'>';
+    }
+
+    /**
+     * The documents asked for, numbered, each with its note after the name.
+     *
+     * @param  Collection<int, LetterRequestedDocument>  $items
+     */
+    private static function checklist(Collection $items): string
+    {
+        return '<ol>'.$items
+            ->map(fn (LetterRequestedDocument $doc) => '<li>'.e($doc->name).(filled($doc->note) ? ' '.e($doc->note) : '').'</li>')
+            ->join('').'</ol>';
     }
 
     /**
@@ -340,6 +427,8 @@ class LetterRenderer
             'items' => self::sumItems((array) $value) === 0 && collect((array) $value)
                 ->every(fn ($section) => collect((array) ($section['rows'] ?? []))->every(fn ($row) => blank($row['name'] ?? null))),
             'list' => self::lines((string) $value) === [],
+            'checklist' => ! $value instanceof Collection || $value->isEmpty(),
+            'currency' => self::amount($value) === 0,
             default => blank($value),
         };
     }

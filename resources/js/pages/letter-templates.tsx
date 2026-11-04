@@ -1,9 +1,11 @@
 import { Head, Link, router } from '@inertiajs/react';
-import { ArrowLeft, ChevronRight, FileText } from 'lucide-react';
+import { ArrowLeft, ChevronRight, FileText, Settings2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
+import { byCategory } from '@/data/letters';
 import type { TemplateSummary } from '@/data/letters';
 import { rowLink } from '@/lib/row-link';
 import { letters } from '@/routes';
+import { settings as letterSettings } from '@/routes/letters';
 import {
     edit as templateEdit,
     seed as seedTemplates,
@@ -11,6 +13,7 @@ import {
 
 type Props = {
     templates: TemplateSummary[];
+    categories: Record<string, string>;
     /** Built-in templates not yet on this install. */
     missingDefaults: number;
 };
@@ -20,6 +23,7 @@ type Props = {
  */
 export default function LetterTemplatesPage({
     templates,
+    categories,
     missingDefaults,
 }: Props) {
     return (
@@ -50,34 +54,64 @@ export default function LetterTemplatesPage({
                         </p>
                     </div>
 
-                    {missingDefaults > 0 ? (
+                    <div className="flex w-full flex-wrap gap-2.5 sm:w-auto">
                         <Button
                             size="lg"
                             variant="outline"
-                            onClick={() =>
-                                router.post(
-                                    seedTemplates().url,
-                                    {},
-                                    {
-                                        preserveScroll: true,
-                                    },
-                                )
-                            }
+                            className="flex-1 sm:flex-none"
+                            asChild
                         >
-                            Pasang template bawaan
+                            <Link href={letterSettings()} prefetch>
+                                <Settings2 strokeWidth={2} aria-hidden />
+                                Penanda tangan & penomoran
+                            </Link>
                         </Button>
-                    ) : null}
+                        {missingDefaults > 0 ? (
+                            <Button
+                                size="lg"
+                                variant="outline"
+                                className="flex-1 sm:flex-none"
+                                onClick={() =>
+                                    router.post(
+                                        seedTemplates().url,
+                                        {},
+                                        {
+                                            preserveScroll: true,
+                                        },
+                                    )
+                                }
+                            >
+                                Pasang template bawaan
+                            </Button>
+                        ) : null}
+                    </div>
                 </div>
 
-                <section className="rounded-xl border border-border bg-card p-5 shadow-lift">
-                    {templates.length === 0 ? (
+                {templates.length === 0 ? (
+                    <section className="rounded-xl border border-border bg-card p-5 shadow-lift">
                         <p className="rounded-lg border border-dashed border-border bg-neutral-soft/60 px-3 py-10 text-center text-xs text-muted-foreground">
                             Belum ada template. Pasang yang bawaan dari tombol
                             di atas.
                         </p>
-                    ) : (
+                    </section>
+                ) : null}
+
+                {byCategory(templates, categories).map((group) => (
+                    <section
+                        key={group.key}
+                        className="rounded-xl border border-border bg-card p-5 shadow-lift"
+                    >
+                        <header className="mb-4 flex items-center justify-between gap-3">
+                            <h2 className="text-base font-extrabold tracking-[-0.02em]">
+                                {group.label}
+                            </h2>
+                            <span className="shrink-0 rounded-full bg-neutral-soft px-2.5 py-1 text-xs font-semibold text-muted-foreground">
+                                <span data-numeric>{group.items.length}</span>{' '}
+                                template
+                            </span>
+                        </header>
                         <ul className="flex flex-col divide-y divide-border">
-                            {templates.map((template) => (
+                            {group.items.map((template) => (
                                 <li
                                     key={template.id}
                                     {...rowLink(templateEdit(template.id))}
@@ -136,8 +170,8 @@ export default function LetterTemplatesPage({
                                 </li>
                             ))}
                         </ul>
-                    )}
-                </section>
+                    </section>
+                ))}
             </div>
         </>
     );

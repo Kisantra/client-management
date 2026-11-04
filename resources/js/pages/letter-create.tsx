@@ -5,6 +5,7 @@ import { toast } from 'sonner';
 import { Field } from '@/components/leads/form-field';
 import { LeadPicker } from '@/components/letters/lead-picker';
 import { Button } from '@/components/ui/button';
+import { byCategory } from '@/data/letters';
 import type { LeadOption, TemplateOption } from '@/data/letters';
 import { cn } from '@/lib/utils';
 import { letters } from '@/routes';
@@ -13,6 +14,7 @@ import { seed as seedTemplates } from '@/routes/letters/templates';
 
 type Props = {
     templates: TemplateOption[];
+    categories: Record<string, string>;
     leads: LeadOption[];
     /** Opened from a lead's page: that lead, already chosen. */
     leadId: number | null;
@@ -23,7 +25,12 @@ type Props = {
  * whom. Everything after that is filled in on the letter itself, where the
  * page can be seen taking shape.
  */
-export default function LetterCreatePage({ templates, leads, leadId }: Props) {
+export default function LetterCreatePage({
+    templates,
+    categories,
+    leads,
+    leadId,
+}: Props) {
     const [templateId, setTemplateId] = useState<number | null>(
         templates.length === 1 ? templates[0].id : null,
     );
@@ -87,7 +94,7 @@ export default function LetterCreatePage({ templates, leads, leadId }: Props) {
                         Buat surat
                     </h1>
                     <p className="mt-1 text-sm text-muted-foreground">
-                        Pilih jenis surat dan client yang dituju. Isinya
+                        Pilih client yang dituju dan jenis suratnya. Isinya
                         dilengkapi di halaman berikutnya sambil melihat hasilnya
                         di atas kop.
                     </p>
@@ -97,6 +104,36 @@ export default function LetterCreatePage({ templates, leads, leadId }: Props) {
                     onSubmit={submit}
                     className="flex max-w-3xl flex-col gap-5"
                 >
+                    <section className="rounded-xl border border-border bg-card p-5 shadow-lift sm:p-6">
+                        <h2 className="text-base font-extrabold tracking-[-0.02em]">
+                            Client yang dituju
+                        </h2>
+                        <p className="mt-1 text-xs leading-relaxed text-muted-foreground">
+                            Nama, PIC, dan inisialnya masuk ke surat dan ke
+                            nomor. Lead yang sudah ditutup tidak ditawarkan.
+                        </p>
+
+                        <div className="mt-5">
+                            <Field
+                                id="lead"
+                                label="Client"
+                                error={errors.lead_id}
+                                hint={
+                                    leads.length === 0
+                                        ? 'Belum ada lead aktif. Tambahkan dulu di halaman Leads.'
+                                        : undefined
+                                }
+                            >
+                                <LeadPicker
+                                    id="lead"
+                                    leads={leads}
+                                    value={lead}
+                                    onChange={setLead}
+                                />
+                            </Field>
+                        </div>
+                    </section>
+
                     <section className="rounded-xl border border-border bg-card p-5 shadow-lift sm:p-6">
                         <h2 className="text-base font-extrabold tracking-[-0.02em]">
                             Jenis surat
@@ -129,75 +166,105 @@ export default function LetterCreatePage({ templates, leads, leadId }: Props) {
                                 </Button>
                             </div>
                         ) : (
-                            <div className="mt-5 grid gap-3 sm:grid-cols-2">
-                                {templates.map((template) => {
-                                    const picked = template.id === templateId;
+                            <div className="mt-5 flex flex-col gap-5">
+                                {byCategory(templates, categories).map(
+                                    (group) => (
+                                        <div key={group.key}>
+                                            <h3 className="mb-2.5 flex items-center gap-2 text-xs font-semibold text-muted-foreground">
+                                                {group.label}
+                                                <span data-numeric>
+                                                    {group.items.length}
+                                                </span>
+                                            </h3>
+                                            <div className="grid gap-3 sm:grid-cols-2">
+                                                {group.items.map((template) => {
+                                                    const picked =
+                                                        template.id ===
+                                                        templateId;
 
-                                    return (
-                                        <label
-                                            key={template.id}
-                                            className={cn(
-                                                'flex cursor-pointer items-start gap-3 rounded-lg border p-4 transition-colors',
-                                                picked
-                                                    ? 'border-primary bg-primary-soft'
-                                                    : 'border-border bg-card hover:border-primary/35',
-                                            )}
-                                        >
-                                            <input
-                                                type="radio"
-                                                name="template"
-                                                value={template.id}
-                                                checked={picked}
-                                                onChange={() =>
-                                                    setTemplateId(template.id)
-                                                }
-                                                className="sr-only"
-                                            />
-                                            <span
-                                                className={cn(
-                                                    'mt-0.5 grid size-8 shrink-0 place-items-center rounded-md',
-                                                    picked
-                                                        ? 'bg-primary text-primary-foreground'
-                                                        : 'bg-neutral-soft text-muted-foreground',
-                                                )}
-                                                aria-hidden
-                                            >
-                                                {picked ? (
-                                                    <Check
-                                                        className="size-4"
-                                                        strokeWidth={2.5}
-                                                    />
-                                                ) : (
-                                                    <FileText
-                                                        className="size-4"
-                                                        strokeWidth={1.75}
-                                                    />
-                                                )}
-                                            </span>
-                                            <span className="min-w-0">
-                                                <span
-                                                    className={cn(
-                                                        'block text-[0.8438rem] font-bold',
-                                                        picked &&
-                                                            'text-primary-deep',
-                                                    )}
-                                                >
-                                                    {template.name}
-                                                </span>
-                                                <span className="mt-0.5 block text-xs leading-relaxed text-muted-foreground">
-                                                    {template.description ??
-                                                        template.subject}
-                                                </span>
-                                                <span
-                                                    className="mt-1.5 inline-block rounded-full bg-card px-2 py-0.5 text-[0.6875rem] font-bold text-secondary-foreground"
-                                                    data-numeric
-                                                >
-                                                    Nomor {template.prefix}-…
-                                                </span>
-                                            </span>
-                                        </label>
-                                    );
-                                })}
+                                                    return (
+                                                        <label
+                                                            key={template.id}
+                                                            className={cn(
+                                                                'flex cursor-pointer items-start gap-3 rounded-lg border p-4 transition-colors',
+                                                                picked
+                                                                    ? 'border-primary bg-primary-soft'
+                                                                    : 'border-border bg-card hover:border-primary/35',
+                                                            )}
+                                                        >
+                                                            <input
+                                                                type="radio"
+                                                                name="template"
+                                                                value={
+                                                                    template.id
+                                                                }
+                                                                checked={picked}
+                                                                onChange={() =>
+                                                                    setTemplateId(
+                                                                        template.id,
+                                                                    )
+                                                                }
+                                                                className="sr-only"
+                                                            />
+                                                            <span
+                                                                className={cn(
+                                                                    'mt-0.5 grid size-8 shrink-0 place-items-center rounded-md',
+                                                                    picked
+                                                                        ? 'bg-primary text-primary-foreground'
+                                                                        : 'bg-neutral-soft text-muted-foreground',
+                                                                )}
+                                                                aria-hidden
+                                                            >
+                                                                {picked ? (
+                                                                    <Check
+                                                                        className="size-4"
+                                                                        strokeWidth={
+                                                                            2.5
+                                                                        }
+                                                                    />
+                                                                ) : (
+                                                                    <FileText
+                                                                        className="size-4"
+                                                                        strokeWidth={
+                                                                            1.75
+                                                                        }
+                                                                    />
+                                                                )}
+                                                            </span>
+                                                            <span className="min-w-0">
+                                                                <span
+                                                                    className={cn(
+                                                                        'block text-[0.8438rem] font-bold',
+                                                                        picked &&
+                                                                            'text-primary-deep',
+                                                                    )}
+                                                                >
+                                                                    {
+                                                                        template.name
+                                                                    }
+                                                                </span>
+                                                                <span className="mt-0.5 block text-xs leading-relaxed text-muted-foreground">
+                                                                    {template.description ??
+                                                                        template.subject}
+                                                                </span>
+                                                                <span
+                                                                    className="mt-1.5 inline-block rounded-full bg-card px-2 py-0.5 text-[0.6875rem] font-bold text-secondary-foreground"
+                                                                    data-numeric
+                                                                >
+                                                                    Nomor{' '}
+                                                                    {
+                                                                        template.prefix
+                                                                    }
+                                                                    -…
+                                                                </span>
+                                                            </span>
+                                                        </label>
+                                                    );
+                                                })}
+                                            </div>
+                                        </div>
+                                    ),
+                                )}
                             </div>
                         )}
 
@@ -206,36 +273,6 @@ export default function LetterCreatePage({ templates, leads, leadId }: Props) {
                                 {errors.template_id}
                             </p>
                         ) : null}
-                    </section>
-
-                    <section className="rounded-xl border border-border bg-card p-5 shadow-lift sm:p-6">
-                        <h2 className="text-base font-extrabold tracking-[-0.02em]">
-                            Client yang dituju
-                        </h2>
-                        <p className="mt-1 text-xs leading-relaxed text-muted-foreground">
-                            Nama, PIC, dan inisialnya masuk ke surat dan ke
-                            nomor. Lead yang sudah ditutup tidak ditawarkan.
-                        </p>
-
-                        <div className="mt-5">
-                            <Field
-                                id="lead"
-                                label="Client"
-                                error={errors.lead_id}
-                                hint={
-                                    leads.length === 0
-                                        ? 'Belum ada lead aktif. Tambahkan dulu di halaman Leads.'
-                                        : undefined
-                                }
-                            >
-                                <LeadPicker
-                                    id="lead"
-                                    leads={leads}
-                                    value={lead}
-                                    onChange={setLead}
-                                />
-                            </Field>
-                        </div>
                     </section>
 
                     <div className="flex flex-wrap justify-end gap-2.5">

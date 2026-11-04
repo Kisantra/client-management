@@ -4,6 +4,8 @@ namespace App\Http\Controllers;
 
 use App\Models\Lead;
 use App\Models\Letter;
+use App\Models\LetterRequestedDocument;
+use App\Models\LetterSigner;
 use App\Models\LetterTemplate;
 use App\Support\LetterRenderer;
 use App\Support\Pipeline;
@@ -34,6 +36,7 @@ class LetterTemplateController extends Controller
                 'code' => $template->code,
                 'name' => $template->name,
                 'description' => $template->description,
+                'category' => $template->category,
                 'prefix' => $template->number_prefix,
                 'subject' => $template->subject,
                 'active' => $template->is_active,
@@ -44,6 +47,7 @@ class LetterTemplateController extends Controller
 
         return Inertia::render('letter-templates', [
             'templates' => $templates,
+            'categories' => LetterTemplate::CATEGORIES,
             'missingDefaults' => collect(LetterTemplate::defaults())
                 ->pluck('code')
                 ->diff(LetterTemplate::query()->pluck('code'))
@@ -59,10 +63,14 @@ class LetterTemplateController extends Controller
                 'code' => $template->code,
                 'name' => $template->name,
                 'description' => $template->description,
+                'category' => $template->category,
                 'prefix' => $template->number_prefix,
                 'subject' => $template->subject,
                 'recipient' => $template->recipient,
                 'stageOnIssue' => $template->stage_on_issue,
+                'signers' => array_column($template->signerSlots(), 'label'),
+                'checklistAsAttachment' => $template->checklist_as_attachment,
+                'hasChecklist' => $template->checklistKeys() !== [],
                 'body' => $template->body,
                 'active' => $template->is_active,
                 'fields' => array_values($template->fieldDefinitions()),
@@ -71,6 +79,7 @@ class LetterTemplateController extends Controller
             ],
             'placeholders' => LetterRenderer::placeholderReference($template),
             'fieldTypes' => LetterTemplate::FIELD_TYPES,
+            'categories' => LetterTemplate::CATEGORIES,
             'preview' => [
                 'html' => LetterRenderer::document($this->sample($template)),
                 'css' => LetterRenderer::styles(),
@@ -83,10 +92,14 @@ class LetterTemplateController extends Controller
         $validated = $request->validate([
             'name' => ['required', 'string', 'max:120'],
             'description' => ['nullable', 'string', 'max:500'],
+            'category' => ['sometimes', Rule::in(array_keys(LetterTemplate::CATEGORIES))],
             'number_prefix' => ['required', 'string', 'max:8', 'regex:/^[A-Za-z]+$/'],
             'subject' => ['required', 'string', 'max:200'],
-            'recipient' => ['required', 'string', 'max:200'],
+            'recipient' => ['nullable', 'string', 'max:200'],
             'stage_on_issue' => ['nullable', Rule::in(Pipeline::keys())],
+            'signers' => ['sometimes', 'array', 'min:1', 'max:4'],
+            'signers.*' => ['required', 'string', 'max:60'],
+            'checklist_as_attachment' => ['sometimes', 'boolean'],
             'body' => ['required', 'string', 'max:20000'],
             'is_active' => ['required', 'boolean'],
             'fields' => ['present', 'array'],
@@ -100,34 +113,41 @@ class LetterTemplateController extends Controller
             'name.required' => 'Beri nama jenis suratnya.',
             'number_prefix.regex' => 'Awalan nomor hanya huruf, misalnya PEN atau S.',
             'body.required' => 'Isi suratnya tidak boleh kosong.',
+            'signers.min' => 'Sisakan paling tidak satu penanda tangan.',
+            'signers.*.required' => 'Beri nama tiap kolom tanda tangan, misalnya Direktur.',
         ]);
 
         /*
          | The editor sends back the words of each field; its type, options
          | and wiring come from what is already stored, so nothing here can
-         | turn a fee table into a text box.
+         | turn a fee table into a text box. A field the editor did not send
+         | stays as it was rather than disappearing from every letter.
          */
-        $existing = $template->fieldDefinitions();
-        $fields = collect($validated['fields'])
-            ->filter(fn (array $field) => isset($existing[$field['key']]))
-            ->map(fn (array $field) => [
-                ...$existing[$field['key']],
-                'label' => trim($field['label']),
-                'help' => filled($field['help'] ?? null) ? trim($field['help']) : null,
-                'placeholder' => filled($field['placeholder'] ?? null) ? trim($field['placeholder']) : null,
-                'required' => (bool) $field['required'],
-                'default' => $this->defaultFor($existing[$field['key']], $field['default'] ?? null),
-            ])
+        $sent = collect($validated['fields'])->keyBy('key');
+        $fields = collect($template->fieldDefinitions())
+            ->map(fn (array $field, string $key) => $sent->has($key) ? [
+                ...$field,
+                'label' => trim($sent[$key]['label']),
+                'help' => filled($sent[$key]['help'] ?? null) ? trim($sent[$key]['help']) : null,
+                'placeholder' => filled($sent[$key]['placeholder'] ?? null) ? trim($sent[$key]['placeholder']) : null,
+                'required' => (bool) $sent[$key]['required'],
+                'default' => $this->defaultFor($field, $sent[$key]['default'] ?? null),
+            ] : $field)
             ->values()
             ->all();
 
         $template->update([
             'name' => trim($validated['name']),
             'description' => filled($validated['description'] ?? null) ? trim($validated['description']) : null,
+            'category' => $validated['category'] ?? $template->category,
             'number_prefix' => strtoupper($validated['number_prefix']),
             'subject' => trim($validated['subject']),
-            'recipient' => trim($validated['recipient']),
+            'recipient' => filled($validated['recipient'] ?? null) ? trim($validated['recipient']) : null,
             'stage_on_issue' => $validated['stage_on_issue'] ?? null,
+            'signers' => array_key_exists('signers', $validated)
+                ? array_map(fn (string $label) => ['label' => trim($label)], array_values($validated['signers']))
+                : $template->signers,
+            'checklist_as_attachment' => (bool) ($validated['checklist_as_attachment'] ?? $template->checklist_as_attachment),
             'body' => trim($validated['body']),
             'is_active' => $validated['is_active'],
             'fields' => $fields,
@@ -176,6 +196,7 @@ class LetterTemplateController extends Controller
                 ])->all(),
             ])->all(),
             'select' => is_string($raw) && array_key_exists($raw, $field['options']) ? $raw : null,
+            'currency' => filled($raw) ? (int) preg_replace('/\D+/', '', (string) $raw) : null,
             default => is_string($raw) && trim($raw) !== '' ? trim($raw) : null,
         };
     }
@@ -199,13 +220,27 @@ class LetterTemplateController extends Controller
             'subject' => $template->subject,
             'recipient' => $template->recipient,
             'values' => $template->defaultValues(),
-            'signer_name' => config('letter.signer.name'),
-            'signer_title' => config('letter.signer.title'),
+            'signers' => Letter::signerSnapshot($template, LetterSigner::defaultsFor($template->signerSlots())),
             'status' => Letter::DRAFT,
         ]);
 
+        // A checklist shows its default lines, the way a new letter would start.
+        $documents = collect($template->fieldDefinitions())
+            ->where('type', 'checklist')
+            ->flatMap(fn (array $field) => collect(preg_split('/\R/', (string) $field['default']) ?: [])
+                ->map(fn ($line) => trim((string) $line))
+                ->filter()
+                ->values()
+                ->map(fn (string $name, int $i) => new LetterRequestedDocument([
+                    'field_key' => $field['key'],
+                    'name' => $name,
+                    'order' => $i + 1,
+                ])))
+            ->values();
+
         $letter->setRelation('template', $template);
         $letter->setRelation('lead', $lead);
+        $letter->setRelation('requestedDocuments', $documents);
 
         return $letter;
     }

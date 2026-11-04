@@ -1,5 +1,5 @@
 import { Head, Link, router } from '@inertiajs/react';
-import { ArrowLeft, Copy, RotateCcw } from 'lucide-react';
+import { ArrowLeft, Copy, Plus, RotateCcw, X } from 'lucide-react';
 import { useState } from 'react';
 import { toast } from 'sonner';
 import { Field } from '@/components/leads/form-field';
@@ -37,6 +37,7 @@ type Props = {
     template: TemplateDetail;
     placeholders: PlaceholderReference;
     fieldTypes: Record<string, string>;
+    categories: Record<string, string>;
     preview: Preview;
 };
 
@@ -57,13 +58,19 @@ export default function LetterTemplateEditPage({
     template,
     placeholders,
     fieldTypes,
+    categories,
     preview,
 }: Props) {
     const [name, setName] = useState(template.name);
     const [description, setDescription] = useState(template.description ?? '');
+    const [category, setCategory] = useState(template.category);
     const [prefix, setPrefix] = useState(template.prefix);
     const [subject, setSubject] = useState(template.subject);
-    const [recipient, setRecipient] = useState(template.recipient);
+    const [recipient, setRecipient] = useState(template.recipient ?? '');
+    const [signers, setSigners] = useState<string[]>(template.signers);
+    const [checklistAsAttachment, setChecklistAsAttachment] = useState(
+        template.checklistAsAttachment,
+    );
     const [stageOnIssue, setStageOnIssue] = useState<string | null>(
         template.stageOnIssue,
     );
@@ -96,10 +103,13 @@ export default function LetterTemplateEditPage({
             {
                 name,
                 description,
+                category,
                 number_prefix: prefix,
                 subject,
                 recipient,
                 stage_on_issue: stageOnIssue ?? '',
+                signers,
+                checklist_as_attachment: checklistAsAttachment,
                 body,
                 is_active: active,
                 fields: fields.map((field) => ({
@@ -231,6 +241,40 @@ export default function LetterTemplateEditPage({
                                     />
                                 </Field>
                                 <Field
+                                    id="category"
+                                    label="Kategori"
+                                    error={errors.category}
+                                    className="sm:col-span-2"
+                                >
+                                    <Select
+                                        value={category}
+                                        onValueChange={(next) =>
+                                            setCategory(
+                                                next as TemplateDetail['category'],
+                                            )
+                                        }
+                                    >
+                                        <SelectTrigger
+                                            id="category"
+                                            className="w-full"
+                                        >
+                                            <SelectValue />
+                                        </SelectTrigger>
+                                        <SelectContent>
+                                            {Object.entries(categories).map(
+                                                ([key, label]) => (
+                                                    <SelectItem
+                                                        key={key}
+                                                        value={key}
+                                                    >
+                                                        {label}
+                                                    </SelectItem>
+                                                ),
+                                            )}
+                                        </SelectContent>
+                                    </Select>
+                                </Field>
+                                <Field
                                     id="description"
                                     label="Keterangan"
                                     optional
@@ -261,8 +305,9 @@ export default function LetterTemplateEditPage({
                                 <Field
                                     id="recipient"
                                     label="Yth. bawaan"
+                                    optional
                                     error={errors.recipient}
-                                    hint="Placeholder boleh dipakai di sini."
+                                    hint="Placeholder boleh dipakai di sini. Kosong berarti tanpa blok tujuan, seperti berita acara."
                                 >
                                     <Input
                                         id="recipient"
@@ -308,6 +353,20 @@ export default function LetterTemplateEditPage({
                                         </SelectContent>
                                     </Select>
                                 </Field>
+                                {template.hasChecklist ? (
+                                    <label className="flex items-center gap-2.5 text-[0.8438rem] font-bold text-secondary-foreground sm:col-span-2">
+                                        <Checkbox
+                                            checked={checklistAsAttachment}
+                                            onCheckedChange={(checked) =>
+                                                setChecklistAsAttachment(
+                                                    checked === true,
+                                                )
+                                            }
+                                        />
+                                        Cetak daftar dokumen di halaman
+                                        Lampiran, bukan di isi surat
+                                    </label>
+                                ) : null}
                                 <label className="flex items-center gap-2.5 text-[0.8438rem] font-bold text-secondary-foreground sm:col-span-2">
                                     <Checkbox
                                         checked={active}
@@ -318,6 +377,88 @@ export default function LetterTemplateEditPage({
                                     Ditawarkan saat membuat surat baru
                                 </label>
                             </div>
+                        </section>
+
+                        <section className="rounded-xl border border-border bg-card p-5 shadow-lift">
+                            <h2 className="text-base font-extrabold tracking-[-0.02em]">
+                                Kolom tanda tangan
+                            </h2>
+                            <p className="mt-1 text-xs leading-relaxed text-muted-foreground">
+                                Satu kolom per penanda tangan, urut dari kiri.
+                                Namanya jabatan, misalnya Manajer atau Direktur;
+                                orangnya dipilih di tiap surat dan tanda
+                                tangannya langsung tercetak.
+                            </p>
+                            <ol className="mt-4 flex flex-col gap-2.5">
+                                {signers.map((label, i) => (
+                                    <li
+                                        key={i}
+                                        className="flex items-center gap-2.5"
+                                    >
+                                        <span
+                                            className="w-5 shrink-0 text-right text-xs font-bold text-muted-foreground"
+                                            data-numeric
+                                        >
+                                            {i + 1}.
+                                        </span>
+                                        <Input
+                                            value={label}
+                                            onChange={(event) =>
+                                                setSigners(
+                                                    signers.map((old, n) =>
+                                                        n === i
+                                                            ? event.target.value
+                                                            : old,
+                                                    ),
+                                                )
+                                            }
+                                            aria-label={`Kolom tanda tangan ${i + 1}`}
+                                            aria-invalid={
+                                                errors[`signers.${i}`]
+                                                    ? true
+                                                    : undefined
+                                            }
+                                        />
+                                        <Button
+                                            type="button"
+                                            variant="ghost"
+                                            size="icon"
+                                            disabled={signers.length === 1}
+                                            onClick={() =>
+                                                setSigners(
+                                                    signers.filter(
+                                                        (_, n) => n !== i,
+                                                    ),
+                                                )
+                                            }
+                                            aria-label={`Hapus kolom ${label || i + 1}`}
+                                        >
+                                            <X strokeWidth={2.5} />
+                                        </Button>
+                                    </li>
+                                ))}
+                            </ol>
+                            {errors.signers ||
+                            Object.keys(errors).some((key) =>
+                                key.startsWith('signers.'),
+                            ) ? (
+                                <p className="mt-2 text-xs font-semibold text-destructive">
+                                    {errors.signers ??
+                                        'Beri nama tiap kolom tanda tangan, misalnya Direktur.'}
+                                </p>
+                            ) : null}
+                            {signers.length < 4 ? (
+                                <Button
+                                    type="button"
+                                    variant="outline"
+                                    size="sm"
+                                    className="mt-3"
+                                    onClick={() => setSigners([...signers, ''])}
+                                >
+                                    <Plus strokeWidth={2.5} aria-hidden />
+                                    Tambah kolom
+                                </Button>
+                            ) : null}
                         </section>
 
                         <section className="rounded-xl border border-border bg-card p-5 shadow-lift">

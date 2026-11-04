@@ -3,6 +3,7 @@
 use App\Models\Activity;
 use App\Models\Lead;
 use App\Models\Letter;
+use App\Models\LetterSigner;
 use App\Models\LetterTemplate;
 use App\Models\User;
 use App\Support\LetterNumber;
@@ -49,8 +50,7 @@ function offer(Lead $lead, array $attributes = []): Letter
         'subject' => $template->subject,
         'recipient' => $template->recipient,
         'values' => $template->defaultValues(),
-        'signer_name' => 'Iqal Azhari',
-        'signer_title' => 'Direktur',
+        'signers' => Letter::signerSnapshot($template, LetterSigner::defaultsFor($template->signerSlots())),
         'status' => Letter::DRAFT,
         ...$attributes,
     ]);
@@ -89,7 +89,8 @@ it('starts a draft from a template with the template defaults', function () {
         ->and($letter->subject)->toBe('Penawaran Jasa Layanan Perpajakan')
         ->and($letter->values['sapaan'])->toBe('Bapak/Ibu')
         ->and($letter->values['layanan'][0]['rows'][0]['amount'])->toBe(10_000_000)
-        ->and($letter->signer_name)->toBe('Iqal Azhari');
+        ->and($letter->signers[0]['name'])->toBe('Iqal Azhari')
+        ->and($letter->signers[0]['title'])->toBe('Direktur');
 
     $this->get(route('letters.show', $letter))
         ->assertOk()
@@ -174,8 +175,7 @@ it('saves the draft as it is typed and reports what is still missing', function 
         'subject' => 'Penawaran Pendampingan SP2DK',
         'recipient' => 'Ibu {{pic}}',
         'letter_date' => '2026-08-28',
-        'signer_name' => 'Iqal Azhari',
-        'signer_title' => 'Direktur',
+        'signers' => [LetterSigner::first()->id],
         'values' => [
             'sapaan' => 'Ibu',
             'layanan' => [['title' => 'Pendampingan SP2DK', 'rows' => [['name' => '', 'amount' => '']]]],
@@ -210,8 +210,7 @@ it('rejects a value the template does not offer', function () {
         'subject' => 'x',
         'recipient' => 'x',
         'letter_date' => '2026-08-28',
-        'signer_name' => 'x',
-        'signer_title' => 'x',
+        'signers' => [],
         'values' => ['sapaan' => 'Saudara'],
     ])->assertSessionHasErrors('values.sapaan');
 });
@@ -336,7 +335,7 @@ it('offers the templates and the open leads to a new letter', function () {
         ->assertOk()
         ->assertInertia(fn ($page) => $page
             ->component('letter-create')
-            ->has('templates', 1)
+            ->has('templates', count(LetterTemplate::defaults()))
             ->where('templates.0.prefix', 'PEN')
             ->has('leads', 1)
             ->where('leadId', $lead->id)
@@ -369,7 +368,7 @@ it('edits the words of a template without changing the shape of its fields', fun
         ->assertOk()
         ->assertInertia(fn ($page) => $page
             ->component('letter-templates')
-            ->has('templates', 1)
+            ->has('templates', count(LetterTemplate::defaults()))
             ->where('missingDefaults', 0)
         );
 
@@ -427,7 +426,7 @@ it('installs the built-in templates on an empty install', function () {
 
     $this->post(route('letters.templates.seed'))->assertRedirect();
 
-    expect(LetterTemplate::count())->toBe(1);
+    expect(LetterTemplate::count())->toBe(count(LetterTemplate::defaults()));
 });
 
 it('returns to the letter form with the new client chosen when the lead was added from there', function () {
