@@ -4,13 +4,18 @@ namespace App\Http\Controllers;
 
 use App\Models\Lead;
 use App\Models\Letter;
+use App\Models\LetterRequestedDocument;
+use App\Models\LetterSigner;
 use App\Models\LetterTemplate;
+use App\Models\RequestedDocumentType;
 use App\Support\LetterNumber;
 use App\Support\LetterRenderer;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Http\Request;
 use Illuminate\Support\Carbon;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\Rule;
+use Illuminate\Validation\ValidationException;
 use Inertia\Inertia;
 use Inertia\Response;
 
@@ -22,6 +27,9 @@ use Inertia\Response;
  * words — and downloaded as the PDF that actually gets sent. The draft
  * saves itself as it is typed, so nothing is lost to a closed tab and the
  * preview is always of what is on record.
+ *
+ * Every letter the office sends goes through here: offers from marketing
+ * and the tax team's replies, berita acara and document requests alike.
  */
 class LetterController extends Controller
 {
@@ -37,8 +45,10 @@ class LetterController extends Controller
             ->with(['template', 'lead', 'creator'])
             ->when($q !== '', fn (Builder $query) => $query->where(function (Builder $where) use ($q) {
                 $like = '%'.$q.'%';
+
                 $where->where('subject', 'like', $like)
                     ->orWhere('number', 'like', $like)
+                    ->orWhere('project', 'like', $like)
                     ->orWhereHas('lead', fn (Builder $lead) => $lead->where('company', 'like', $like));
             }));
 
@@ -90,8 +100,10 @@ class LetterController extends Controller
                     'description' => $template->description,
                     'prefix' => $template->number_prefix,
                     'subject' => $template->subject,
+                    'category' => $template->category,
                 ])
                 ->all(),
+            'categories' => LetterTemplate::CATEGORIES,
             /* Every lead still in play, so a letter can go to a prospect as
                well as to a signed client. A closed lead is not written to. */
             'leads' => Lead::query()->active()->orderBy('company')->get()
@@ -120,18 +132,23 @@ class LetterController extends Controller
         $template = LetterTemplate::findOrFail($validated['template_id']);
         $lead = Lead::findOrFail($validated['lead_id']);
 
-        $letter = Letter::create([
-            'letter_template_id' => $template->id,
-            'lead_id' => $lead->id,
-            'created_by' => $request->user()->id,
-            'letter_date' => Carbon::today(),
-            'subject' => $template->subject,
-            'recipient' => $template->recipient,
-            'values' => $template->defaultValues(),
-            'signer_name' => config('letter.signer.name'),
-            'signer_title' => config('letter.signer.title'),
-            'status' => Letter::DRAFT,
-        ]);
+        $letter = DB::transaction(function () use ($template, $lead, $request) {
+            $letter = Letter::create([
+                'letter_template_id' => $template->id,
+                'lead_id' => $lead->id,
+                'created_by' => $request->user()->id,
+                'letter_date' => Carbon::today(),
+                'subject' => $template->subject,
+                'recipient' => $template->recipient,
+                'values' => $template->defaultValues(),
+                'signers' => Letter::signerSnapshot($template, LetterSigner::defaultsFor($template->signerSlots())),
+                'status' => Letter::DRAFT,
+            ]);
+
+            $this->seedChecklists($letter, $template);
+
+            return $letter;
+        });
 
         $this->toast(
             'Draft surat dibuat',
@@ -143,7 +160,7 @@ class LetterController extends Controller
 
     public function show(Letter $letter): Response
     {
-        $letter->load(['template', 'lead', 'creator']);
+        $letter->load(['template', 'lead', 'creator', 'requestedDocuments.type', 'requestedDocuments.receiver']);
 
         return Inertia::render('letter-edit', [
             'letter' => $this->detail($letter),
@@ -154,6 +171,7 @@ class LetterController extends Controller
             ],
             'missing' => LetterRenderer::missing($letter),
             'total' => LetterRenderer::total($letter),
+            'hasItems' => collect($letter->template->fieldDefinitions())->contains('type', 'items'),
             /* What the number will be, so the writer sees it before it is
                spent. Drawn for real only when the letter is issued. */
             'nextNumber' => $letter->number ?? LetterNumber::preview(
@@ -161,6 +179,16 @@ class LetterController extends Controller
                 $letter->letter_date,
                 $letter->lead->company,
             ),
+            'signers' => LetterSigner::query()->active()->ordered()->get()
+                ->map(fn (LetterSigner $signer) => [
+                    'id' => $signer->id,
+                    'name' => $signer->name,
+                    'title' => $signer->title,
+                    'hasSignature' => $signer->hasSignature(),
+                ])
+                ->all(),
+            'projects' => $this->projectSuggestions($letter->lead),
+            'documentTypes' => $letter->template->checklistKeys() === [] ? [] : RequestedDocumentType::grouped(),
         ]);
     }
 
@@ -174,23 +202,29 @@ class LetterController extends Controller
 
         $letter->load('template');
         $fields = $letter->template->fieldDefinitions();
+        $slots = $letter->template->signerSlots();
 
         $validated = $request->validate([
             'subject' => ['required', 'string', 'max:200'],
-            'recipient' => ['required', 'string', 'max:200'],
+            'recipient' => ['nullable', 'string', 'max:200'],
+            'project' => ['nullable', 'string', 'max:160'],
             'letter_date' => ['required', 'date'],
-            'signer_name' => ['required', 'string', 'max:120'],
-            'signer_title' => ['required', 'string', 'max:120'],
+            'signers' => ['present', 'array', 'max:'.count($slots)],
+            'signers.*' => ['nullable', 'integer', Rule::exists('letter_signers', 'id')],
             'values' => ['present', 'array'],
             ...$this->valueRules($fields),
         ], [
             'subject.required' => 'Perihal tidak boleh kosong.',
-            'recipient.required' => 'Tujuan surat tidak boleh kosong.',
-            'signer_name.required' => 'Sebutkan siapa yang menandatangani.',
         ]);
 
+        $this->guardNumberedDate($letter, $validated['letter_date']);
+
         $letter->update([
-            ...collect($validated)->except('values')->all(),
+            'subject' => trim($validated['subject']),
+            'recipient' => filled($validated['recipient'] ?? null) ? trim($validated['recipient']) : null,
+            'project' => filled($validated['project'] ?? null) ? trim($validated['project']) : null,
+            'letter_date' => $validated['letter_date'],
+            'signers' => Letter::signerSnapshot($letter->template, array_values($validated['signers'])),
             'values' => $this->cleanValues($fields, $validated['values']),
         ]);
 
@@ -214,6 +248,82 @@ class LetterController extends Controller
     }
 
     /**
+     * A checklist starts from its default lines, each matched to the master
+     * list where the name is the same, so a new request letter opens with
+     * the documents the office usually asks for already on it.
+     */
+    private function seedChecklists(Letter $letter, LetterTemplate $template): void
+    {
+        foreach ($template->fieldDefinitions() as $key => $field) {
+            if ($field['type'] !== 'checklist' || blank($field['default'])) {
+                continue;
+            }
+
+            $names = collect(preg_split('/\R/', (string) $field['default']) ?: [])
+                ->map(fn ($line) => trim((string) preg_replace('/^\s*(\d+[.)]|[-*•])\s*/', '', $line)))
+                ->filter()
+                ->unique()
+                ->values();
+
+            $types = RequestedDocumentType::query()->active()->whereIn('name', $names)->pluck('id', 'name');
+
+            foreach ($names as $i => $name) {
+                $letter->requestedDocuments()->create([
+                    'field_key' => $key,
+                    'requested_document_type_id' => $types[$name] ?? null,
+                    'name' => $name,
+                    'order' => $i + 1,
+                ]);
+            }
+        }
+    }
+
+    /**
+     * The number already carries the month and year it was drawn in. A
+     * numbered letter pulled back for a correction may move within that
+     * month, never out of it, or "VIII/2026" would sit on a September page.
+     */
+    private function guardNumberedDate(Letter $letter, string $date): void
+    {
+        if ($letter->number === null) {
+            return;
+        }
+
+        $next = Carbon::parse($date);
+
+        if ($next->format('Y-m') !== $letter->letter_date->format('Y-m')) {
+            throw ValidationException::withMessages([
+                'letter_date' => 'Nomor '.$letter->number.' sudah memuat bulan dan tahunnya. Tanggal hanya bisa digeser di dalam bulan itu.',
+            ]);
+        }
+    }
+
+    /**
+     * Projects to offer: the lead's own service first, then the office's
+     * services, then whatever has been typed on earlier letters. Any other
+     * name can still be typed; this only saves the typing.
+     *
+     * @return array<int, string>
+     */
+    private function projectSuggestions(Lead $lead): array
+    {
+        $used = Letter::query()
+            ->whereNotNull('project')
+            ->latest('updated_at')
+            ->limit(200)
+            ->pluck('project');
+
+        return collect([$lead->service])
+            ->merge(config('pipeline.services', []))
+            ->merge($used)
+            ->map(fn ($name) => trim((string) $name))
+            ->filter()
+            ->unique(fn (string $name) => mb_strtolower($name))
+            ->values()
+            ->all();
+    }
+
+    /**
      * @return array<string, mixed>
      */
     private function detail(Letter $letter): array
@@ -225,14 +335,27 @@ class LetterController extends Controller
             'statusLabel' => $letter->statusLabel(),
             'subject' => $letter->subject,
             'recipient' => $letter->recipient,
+            'project' => $letter->project,
             'date' => $letter->letter_date->toDateString(),
-            'signerName' => $letter->signer_name,
-            'signerTitle' => $letter->signer_title,
+            'signers' => collect($letter->signatureBlocks())
+                ->map(fn (array $block) => [
+                    'label' => $block['label'],
+                    'signerId' => $block['signerId'],
+                    'name' => $block['name'],
+                    'title' => $block['title'],
+                    'hasSignature' => LetterSigner::fileFor($block['image']) !== null,
+                ])
+                ->all(),
             'values' => (object) ($letter->values ?? []),
+            'documents' => $letter->requestedDocuments->map(fn (LetterRequestedDocument $doc) => $doc->toItem())->all(),
             'issuedAt' => $letter->issued_at?->toDateString(),
             'author' => $letter->creator?->name,
             'canDelete' => $letter->canBeDeleted(),
-            'template' => ['id' => $letter->template->id, 'name' => $letter->template->name],
+            'template' => [
+                'id' => $letter->template->id,
+                'name' => $letter->template->name,
+                'checklistAsAttachment' => $letter->template->checklist_as_attachment,
+            ],
             'client' => [
                 'id' => $letter->lead->id,
                 'name' => $letter->clientName(),
@@ -258,6 +381,9 @@ class LetterController extends Controller
                 'select' => ['nullable', 'string', Rule::in(array_keys($field['options']))],
                 'date' => ['nullable', 'date'],
                 'list', 'textarea' => ['nullable', 'string', 'max:5000'],
+                'currency', 'number' => ['nullable', 'regex:/^[\d.,\s]*$/', 'max:30'],
+                // A checklist's documents are written through their own endpoint.
+                'checklist' => ['nullable'],
                 default => ['nullable', 'string', 'max:500'],
             };
 
@@ -295,6 +421,8 @@ class LetterController extends Controller
                         'amount' => (int) preg_replace('/\D+/', '', (string) ($row['amount'] ?? '')),
                     ])->all(),
                 ])->all(),
+                'currency' => filled($value) ? (int) preg_replace('/\D+/', '', (string) $value) : null,
+                'checklist' => null,
                 default => is_string($value) ? (trim($value) === '' ? null : trim($value)) : $value,
             };
         }

@@ -30,6 +30,7 @@ class DatabaseSeeder extends Seeder
         /* The letters the office sends, in its own words. Only what is
            missing is written, so an edited template is never overwritten. */
         $this->call(LetterTemplateSeeder::class);
+        $this->call(RequestedDocumentTypeSeeder::class);
 
         // $this->call(LeadSeeder::class);
         // $this->call(ContentSeeder::class);

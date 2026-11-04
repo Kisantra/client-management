@@ -16,14 +16,19 @@ use App\Http\Controllers\LeadNoteController;
 use App\Http\Controllers\LeadStageController;
 use App\Http\Controllers\LetterCancelController;
 use App\Http\Controllers\LetterController;
+use App\Http\Controllers\LetterCounterController;
+use App\Http\Controllers\LetterDocumentController;
 use App\Http\Controllers\LetterIssueController;
 use App\Http\Controllers\LetterPdfController;
+use App\Http\Controllers\LetterSettingsController;
+use App\Http\Controllers\LetterSignerController;
 use App\Http\Controllers\LetterTemplateController;
 use App\Http\Controllers\NewsController;
 use App\Http\Controllers\NotificationController;
 use App\Http\Controllers\PerformanceController;
 use App\Http\Controllers\PerformanceReportController;
 use App\Http\Controllers\ReportController;
+use App\Http\Controllers\RequestedDocumentTypeController;
 use App\Http\Controllers\SocialVideoController;
 use App\Http\Controllers\TeamController;
 use Illuminate\Support\Facades\Auth;
@@ -162,6 +167,24 @@ Route::middleware(['auth', 'verified'])->group(function () {
         ->whereNumber('template')
         ->name('letters.templates.restore');
 
+    /* Who signs, the documents a checklist picks from, and where each
+       number sequence stands. A signer is updated by POST because the
+       form carries an image. */
+    Route::get('surat/pengaturan', [LetterSettingsController::class, 'index'])->name('letters.settings');
+    Route::post('surat/pengaturan/penanda-tangan', [LetterSignerController::class, 'store'])->name('letters.signers.store');
+    Route::post('surat/pengaturan/penanda-tangan/{signer}', [LetterSignerController::class, 'update'])
+        ->whereNumber('signer')
+        ->name('letters.signers.update');
+    Route::get('surat/pengaturan/penanda-tangan/{signer}/ttd', [LetterSignerController::class, 'image'])
+        ->whereNumber('signer')
+        ->name('letters.signers.image');
+    Route::post('surat/pengaturan/dokumen', [RequestedDocumentTypeController::class, 'store'])->name('letters.types.store');
+    Route::post('surat/pengaturan/dokumen/pasang', [RequestedDocumentTypeController::class, 'seed'])->name('letters.types.seed');
+    Route::patch('surat/pengaturan/dokumen/{type}', [RequestedDocumentTypeController::class, 'update'])
+        ->whereNumber('type')
+        ->name('letters.types.update');
+    Route::patch('surat/pengaturan/nomor', [LetterCounterController::class, 'update'])->name('letters.counters.update');
+
     Route::prefix('surat/{letter}')->whereNumber('letter')->group(function () {
         Route::get('/', [LetterController::class, 'show'])->name('letters.show');
         Route::patch('/', [LetterController::class, 'update'])->name('letters.update');
@@ -171,6 +194,17 @@ Route::middleware(['auth', 'verified'])->group(function () {
         Route::delete('terbit', [LetterIssueController::class, 'destroy'])->name('letters.issue.destroy');
         Route::post('batal', LetterCancelController::class)->name('letters.cancel');
         Route::get('pdf', LetterPdfController::class)->name('letters.pdf');
+
+        Route::post('dokumen', [LetterDocumentController::class, 'store'])->name('letters.documents.store');
+        Route::patch('dokumen/{document}', [LetterDocumentController::class, 'update'])
+            ->whereNumber('document')
+            ->name('letters.documents.update');
+        Route::delete('dokumen/{document}', [LetterDocumentController::class, 'destroy'])
+            ->whereNumber('document')
+            ->name('letters.documents.destroy');
+        Route::post('dokumen/{document}/terima', [LetterDocumentController::class, 'receive'])
+            ->whereNumber('document')
+            ->name('letters.documents.receive');
     });
 
     Route::get('team', [TeamController::class, 'index'])->name('team');

@@ -36,7 +36,10 @@ import {
     ideas as contentIdeas,
     news as contentNews,
 } from '@/routes/content';
-import { templates as letterTemplates } from '@/routes/letters';
+import {
+    settings as letterSettings,
+    templates as letterTemplates,
+} from '@/routes/letters';
 import { edit as editProfile } from '@/routes/profile';
 import type { NavGroup, SharedProps } from '@/types';
 
@@ -106,6 +109,11 @@ function buildNav(counts: SharedProps['counts']): NavGroup[] {
                             title: 'Template',
                             href: letterTemplates(),
                             section: '/surat/template',
+                        },
+                        {
+                            title: 'Pengaturan',
+                            href: letterSettings(),
+                            section: '/surat/pengaturan',
                         },
                     ],
                 },

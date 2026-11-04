@@ -6,7 +6,9 @@ use App\Models\Concerns\RecordsActivity;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Support\Carbon;
+use Illuminate\Support\Collection;
 
 /**
  * One letter to one lead, made from a template.
@@ -18,6 +20,11 @@ use Illuminate\Support\Carbon;
  * a letter that should never have gone out is cancelled, which keeps the
  * number too so the register has no gap.
  *
+ * The signers are chosen per letter from the office's list and their
+ * signatures print as soon as they are chosen; there is no approval round.
+ * While the letter is a draft the list follows the signer records, so a new
+ * signature image shows at once; issuing freezes name, title and image.
+ *
  * @property int $id
  * @property int $letter_template_id
  * @property int $lead_id
@@ -27,16 +34,17 @@ use Illuminate\Support\Carbon;
  * @property int|null $year
  * @property Carbon $letter_date
  * @property string $subject
- * @property string $recipient
+ * @property string|null $recipient
+ * @property string|null $project
  * @property array<string, mixed> $values
- * @property string $signer_name
- * @property string $signer_title
+ * @property array<int, array{label?: string, signer_id?: int|null, name?: string|null, title?: string|null, image?: string|null}>|null $signers
  * @property string $status
  * @property string|null $rendered_html
  * @property Carbon|null $issued_at
  * @property-read LetterTemplate $template
  * @property-read Lead $lead
  * @property-read User|null $creator
+ * @property-read Collection<int, LetterRequestedDocument> $requestedDocuments
  */
 class Letter extends Model
 {
@@ -63,6 +71,7 @@ class Letter extends Model
     {
         return [
             'values' => 'array',
+            'signers' => 'array',
             'letter_date' => 'date',
             'issued_at' => 'datetime',
         ];
@@ -84,6 +93,104 @@ class Letter extends Model
     public function creator(): BelongsTo
     {
         return $this->belongsTo(User::class, 'created_by');
+    }
+
+    /** @return HasMany<LetterRequestedDocument, $this> */
+    public function requestedDocuments(): HasMany
+    {
+        return $this->hasMany(LetterRequestedDocument::class)->orderBy('order')->orderBy('id');
+    }
+
+    /**
+     * The documents asked for under one checklist field, in order.
+     *
+     * @return Collection<int, LetterRequestedDocument>
+     */
+    public function checklist(string $fieldKey): Collection
+    {
+        return $this->requestedDocuments->where('field_key', $fieldKey)->values();
+    }
+
+    /**
+     * Who signs, one entry per slot of the template, ready to print.
+     *
+     * A draft reads each chosen signer's current record; an issued letter
+     * prints what was frozen when it went out, even if the signer has since
+     * changed title or image.
+     *
+     * @return array<int, array{label: string, signerId: int|null, name: string|null, title: string|null, image: string|null}>
+     */
+    public function signatureBlocks(): array
+    {
+        $stored = array_values($this->signers ?? []);
+        $slots = $this->isDraft() || $stored === []
+            ? $this->template->signerSlots()
+            : array_map(fn ($entry) => ['label' => (string) ($entry['label'] ?? '')], $stored);
+
+        $live = $this->isDraft()
+            ? LetterSigner::query()->whereKey(array_filter(array_column($stored, 'signer_id')))->get()->keyBy('id')
+            : collect();
+
+        return collect($slots)
+            ->values()
+            ->map(function (array $slot, int $i) use ($stored, $live) {
+                $entry = $stored[$i] ?? [];
+                $id = isset($entry['signer_id']) ? (int) $entry['signer_id'] : null;
+                $signer = $id ? $live->get($id) : null;
+
+                return [
+                    'label' => $slot['label'],
+                    'signerId' => $id,
+                    'name' => $signer->name ?? ($entry['name'] ?? null),
+                    'title' => $signer->title ?? ($entry['title'] ?? null),
+                    'image' => $signer->signature_path ?? ($entry['image'] ?? null),
+                ];
+            })
+            ->all();
+    }
+
+    /**
+     * The signer list as stored: each slot's chosen signer with their name,
+     * title and image copied in, so the record reads on its own.
+     *
+     * @param  array<int, int|null>  $signerIds  by slot index
+     * @return array<int, array{label: string, signer_id: int|null, name: string|null, title: string|null, image: string|null}>
+     */
+    public static function signerSnapshot(LetterTemplate $template, array $signerIds): array
+    {
+        $signers = LetterSigner::query()->whereKey(array_filter($signerIds))->get()->keyBy('id');
+
+        return collect($template->signerSlots())
+            ->values()
+            ->map(function (array $slot, int $i) use ($signerIds, $signers) {
+                $signer = isset($signerIds[$i]) ? $signers->get((int) $signerIds[$i]) : null;
+
+                return [
+                    'label' => $slot['label'],
+                    'signer_id' => $signer?->id,
+                    'name' => $signer?->name,
+                    'title' => $signer?->title,
+                    'image' => $signer?->signature_path,
+                ];
+            })
+            ->all();
+    }
+
+    /**
+     * The signer list in its stored shape, read through signatureBlocks()
+     * so each chosen signer's current record is what gets frozen.
+     *
+     * @return array<int, array{label: string, signer_id: int|null, name: string|null, title: string|null, image: string|null}>
+     */
+    public function frozenSigners(): array
+    {
+        return array_map(fn (array $block) => [
+            'label' => $block['label'],
+            'signer_id' => $block['signerId'],
+            'name' => $block['name'],
+            'title' => $block['title'],
+            'image' => $block['image'],
+        ], $this->signatureBlocks());
     }
 
     public function scopeStatus(Builder $query, ?string $status): Builder
@@ -145,6 +252,7 @@ class Letter extends Model
             'number' => $this->number,
             'subject' => $this->subject,
             'template' => $this->template->name,
+            'project' => $this->project,
             'client' => $this->clientName(),
             'leadId' => $this->lead_id,
             'date' => $this->letter_date->toDateString(),
@@ -176,7 +284,7 @@ class Letter extends Model
      */
     public function activityIgnores(): array
     {
-        return ['values', 'rendered_html', 'subject', 'recipient', 'signer_name', 'signer_title', 'letter_date', 'issued_at', 'sequence', 'year'];
+        return ['values', 'rendered_html', 'subject', 'recipient', 'project', 'signers', 'letter_date', 'issued_at', 'sequence', 'year'];
     }
 
     public function activityFieldLabels(): array

@@ -26,21 +26,31 @@ export function Paper({
     className?: string;
 }) {
     const frame = useRef<HTMLDivElement>(null);
+    const sheet = useRef<HTMLDivElement>(null);
     const [scale, setScale] = useState(1);
+    /* The unscaled height of the pages. A transform does not change layout,
+       so the box around a scaled sheet would otherwise keep the full height
+       and leave a blank band under it — one per attachment page. */
+    const [height, setHeight] = useState(PAGE_HEIGHT);
 
     useLayoutEffect(() => {
         const node = frame.current;
+        const pages = sheet.current;
 
-        if (!node) {
+        if (!node || !pages) {
             return;
         }
 
-        const fit = () => setScale(Math.min(1, node.clientWidth / PAGE_WIDTH));
+        const fit = () => {
+            setScale(Math.min(1, node.clientWidth / PAGE_WIDTH));
+            setHeight(Math.max(PAGE_HEIGHT, pages.offsetHeight));
+        };
 
         fit();
 
         const observer = new ResizeObserver(fit);
         observer.observe(node);
+        observer.observe(pages);
 
         return () => observer.disconnect();
     }, []);
@@ -55,10 +65,11 @@ export function Paper({
                 )}
                 style={{
                     width: PAGE_WIDTH * scale,
-                    minHeight: PAGE_HEIGHT * scale,
+                    height: height * scale,
                 }}
             >
                 <div
+                    ref={sheet}
                     className="origin-top-left"
                     style={{
                         width: PAGE_WIDTH,

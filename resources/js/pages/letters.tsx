@@ -197,7 +197,7 @@ export default function LettersPage({
                         <input
                             value={query}
                             onChange={(event) => search(event.target.value)}
-                            placeholder="Cari nomor, perihal, atau client"
+                            placeholder="Cari nomor, perihal, client, atau proyek"
                             className="h-11 w-full rounded-md border border-border bg-card pr-9 pl-9 text-[0.8438rem] font-semibold shadow-lift outline-none placeholder:font-normal placeholder:text-muted-foreground focus-visible:border-ring focus-visible:ring-[3px] focus-visible:ring-ring/50"
                         />
                         {query ? (
@@ -303,7 +303,9 @@ export default function LettersPage({
                                                         {letter.subject}
                                                     </span>
                                                     <span className="block truncate text-xs text-muted-foreground">
-                                                        {letter.template}
+                                                        {letter.project
+                                                            ? `${letter.template} · ${letter.project}`
+                                                            : letter.template}
                                                     </span>
                                                 </td>
                                                 <td className="max-w-[16rem] truncate py-3 pr-4">
