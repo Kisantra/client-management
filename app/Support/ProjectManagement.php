@@ -26,6 +26,18 @@ class ProjectManagement
             && filled(config('services.project_management.token'));
     }
 
+    /** Scheme, host and port of Project Management, e.g. "https://dev.kisantra.com"; empty when unset. */
+    public static function origin(): string
+    {
+        $parts = parse_url((string) config('services.project_management.url'));
+
+        if (! isset($parts['scheme'], $parts['host'])) {
+            return '';
+        }
+
+        return $parts['scheme'].'://'.$parts['host'].(isset($parts['port']) ? ':'.$parts['port'] : '');
+    }
+
     /** Whether a request from Project Management carries the shared token. */
     public static function accepts(?string $token): bool
     {

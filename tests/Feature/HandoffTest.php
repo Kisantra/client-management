@@ -301,7 +301,9 @@ describe('the API Project Management reads', function () {
 
         $this->get($response->json('data.0.preview_url'))
             ->assertOk()
-            ->assertHeader('Content-Disposition', 'inline; filename=Perjanjian-Jasa.pdf');
+            ->assertHeader('Content-Disposition', 'inline; filename=Perjanjian-Jasa.pdf')
+            // Project Management shows it in a frame; nobody else may.
+            ->assertHeader('Content-Security-Policy', "frame-ancestors 'self' ".PM);
     });
 
     it('lets the preview link expire', function () {

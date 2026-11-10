@@ -7,6 +7,7 @@ use App\Models\Lead;
 use App\Models\LeadAttachment;
 use App\Support\Attachments;
 use App\Support\Pipeline;
+use App\Support\ProjectManagement;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Support\Facades\URL;
 use Symfony\Component\HttpFoundation\StreamedResponse;
@@ -64,12 +65,27 @@ class HandoffDocumentController extends Controller
         return response()->json(['data' => $documents->values()]);
     }
 
-    /** The file itself, inline, so it opens in a frame as well as downloads. */
+    /**
+     * The file itself, inline, so Project Management can show it in a frame.
+     *
+     * The server sends X-Frame-Options: SAMEORIGIN on every page, which keeps
+     * this app out of other sites' frames. A frame-ancestors policy overrides
+     * that header in browsers, so this one response names Project Management
+     * as the only other place allowed to frame it; every other page keeps the
+     * stricter rule.
+     */
     public function show(LeadAttachment $attachment): StreamedResponse
     {
         abort_unless($attachment->lead->handoff()->exists(), 404);
 
-        return Attachments::inline($attachment);
+        $response = Attachments::inline($attachment);
+
+        $response->headers->set(
+            'Content-Security-Policy',
+            trim("frame-ancestors 'self' ".ProjectManagement::origin()),
+        );
+
+        return $response;
     }
 
     private static function kind(LeadAttachment $attachment): string
