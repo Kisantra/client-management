@@ -19,6 +19,7 @@ import { useState } from 'react';
 import { ChannelIcon } from '@/components/leads/channel-icon';
 import { CloseLeadDialog } from '@/components/leads/close-lead-dialog';
 import { FollowUpDialog } from '@/components/leads/followup-dialog';
+import { HandoffPanel } from '@/components/leads/handoff-panel';
 import { NoteComposer } from '@/components/leads/note-composer';
 import { OfficeMap } from '@/components/leads/office-map';
 import { STAGE_DOT } from '@/components/leads/stage-mark';
@@ -34,9 +35,16 @@ import {
     DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
 import { CHANNEL_LABELS } from '@/data/dashboard';
-import { entryDate, longDate, relativeDays, rupiah } from '@/data/leads';
+import {
+    entryDate,
+    longDate,
+    relativeDays,
+    rupiah,
+    SIGNED_STAGES,
+} from '@/data/leads';
 import type {
     FollowUp,
+    Handoff,
     LeadDetail,
     LeadNote,
     NoteFile,
@@ -59,6 +67,8 @@ import { create as letterCreate, show as letterShow } from '@/routes/letters';
 type Props = {
     lead: LeadDetail;
     timeline: StageStep[];
+    /** Where the client stands in Project Management, once it went over. */
+    handoff: Handoff | null;
     notes: LeadNote[];
     followUps: FollowUp[];
     /** What has been written to this lead on the letterhead, newest first. */
@@ -68,6 +78,7 @@ type Props = {
 export default function LeadDetailPage({
     lead,
     timeline,
+    handoff,
     notes,
     followUps,
     letters,
@@ -78,8 +89,11 @@ export default function LeadDetailPage({
     const [reopening, setReopening] = useState(false);
 
     const labels = useStageLabels();
+    const { handoff: handsOver } = usePipeline();
 
     const closed = lead.status !== 'aktif';
+    /** Signed and still on: Project Management should be holding it. */
+    const signed = !closed && SIGNED_STAGES.includes(lead.stage);
     /** Won and still running: the Client page is home now, not the board. */
     const isClient = !closed && lead.stage === 'client';
     const nextFollowUp = closed
@@ -452,6 +466,14 @@ export default function LeadDetailPage({
                             ) : null}
                         </Panel>
 
+                        {handoff || (handsOver && signed) ? (
+                            <HandoffPanel
+                                handoff={handoff}
+                                leadId={lead.id}
+                                signed={signed}
+                            />
+                        ) : null}
+
                         <Panel
                             title="Surat"
                             description="Penawaran dan surat lain yang dibuat untuk client ini."
@@ -581,6 +603,7 @@ export default function LeadDetailPage({
                 toStage={pendingStage}
                 leadId={lead.id}
                 company={lead.company}
+                handover={handsOver && !signed ? handoverRows(lead) : undefined}
             />
 
             <FollowUpDialog
@@ -604,6 +627,37 @@ export default function LeadDetailPage({
 
 function Blank() {
     return <span className="font-normal text-muted-foreground">Belum ada</span>;
+}
+
+/** What Project Management receives when this lead is signed. */
+function handoverRows(lead: LeadDetail) {
+    const person = lead.entity === 'Perorangan';
+
+    return [
+        {
+            label: 'Client',
+            value: `${person ? lead.name : lead.company} · ${person ? 'Pribadi' : 'Badan'}`,
+        },
+        { label: 'NPWP', value: lead.npwp },
+        { label: 'Email', value: lead.email },
+        {
+            label: 'Alamat',
+            value: [lead.address, lead.city].filter(Boolean).join(', ') || null,
+        },
+        {
+            label: 'PIC',
+            value: [lead.pic, lead.picRole, lead.phone]
+                .filter(Boolean)
+                .join(' · '),
+        },
+        { label: 'Layanan', value: lead.service },
+        { label: 'Nilai deal', value: rupiah.format(lead.value) },
+        { label: 'PJ marketing', value: lead.owner },
+        {
+            label: 'Dokumen',
+            value: 'Semua lampiran lead ini, disalin tim pajak saat memproses',
+        },
+    ];
 }
 
 function FileChip({ file }: { file: NoteFile }) {

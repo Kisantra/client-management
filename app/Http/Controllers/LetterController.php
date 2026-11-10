@@ -132,23 +132,7 @@ class LetterController extends Controller
         $template = LetterTemplate::findOrFail($validated['template_id']);
         $lead = Lead::findOrFail($validated['lead_id']);
 
-        $letter = DB::transaction(function () use ($template, $lead, $request) {
-            $letter = Letter::create([
-                'letter_template_id' => $template->id,
-                'lead_id' => $lead->id,
-                'created_by' => $request->user()->id,
-                'letter_date' => Carbon::today(),
-                'subject' => $template->subject,
-                'recipient' => $template->recipient,
-                'values' => $template->defaultValues(),
-                'signers' => Letter::signerSnapshot($template, LetterSigner::defaultsFor($template->signerSlots())),
-                'status' => Letter::DRAFT,
-            ]);
-
-            $this->seedChecklists($letter, $template);
-
-            return $letter;
-        });
+        $letter = DB::transaction(fn () => Letter::draft($template, $lead, $request->user()));
 
         $this->toast(
             'Draft surat dibuat',
@@ -245,37 +229,6 @@ class LetterController extends Controller
         $this->toast('Draft dihapus', $subject);
 
         return to_route('letters');
-    }
-
-    /**
-     * A checklist starts from its default lines, each matched to the master
-     * list where the name is the same, so a new request letter opens with
-     * the documents the office usually asks for already on it.
-     */
-    private function seedChecklists(Letter $letter, LetterTemplate $template): void
-    {
-        foreach ($template->fieldDefinitions() as $key => $field) {
-            if ($field['type'] !== 'checklist' || blank($field['default'])) {
-                continue;
-            }
-
-            $names = collect(preg_split('/\R/', (string) $field['default']) ?: [])
-                ->map(fn ($line) => trim((string) preg_replace('/^\s*(\d+[.)]|[-*•])\s*/', '', $line)))
-                ->filter()
-                ->unique()
-                ->values();
-
-            $types = RequestedDocumentType::query()->active()->whereIn('name', $names)->pluck('id', 'name');
-
-            foreach ($names as $i => $name) {
-                $letter->requestedDocuments()->create([
-                    'field_key' => $key,
-                    'requested_document_type_id' => $types[$name] ?? null,
-                    'name' => $name,
-                    'order' => $i + 1,
-                ]);
-            }
-        }
     }
 
     /**

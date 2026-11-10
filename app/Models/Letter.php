@@ -150,6 +150,63 @@ class Letter extends Model
     }
 
     /**
+     * A fresh draft of a template for a lead, with the template's default
+     * wording, its default signers, and any document checklist it carries.
+     *
+     * Shared by the letter form and the lead form's "buat penawaran" shortcut,
+     * so a draft looks the same whichever door it came through.
+     */
+    public static function draft(LetterTemplate $template, Lead $lead, User $by): self
+    {
+        $letter = self::create([
+            'letter_template_id' => $template->id,
+            'lead_id' => $lead->id,
+            'created_by' => $by->id,
+            'letter_date' => Carbon::today(),
+            'subject' => $template->subject,
+            'recipient' => $template->recipient,
+            'values' => $template->defaultValues(),
+            'signers' => self::signerSnapshot($template, LetterSigner::defaultsFor($template->signerSlots())),
+            'status' => self::DRAFT,
+        ]);
+
+        $letter->seedChecklists($template);
+
+        return $letter;
+    }
+
+    /**
+     * A checklist starts from its default lines, each matched to the master
+     * list where the name is the same, so a new request letter opens with
+     * the documents the office usually asks for already on it.
+     */
+    private function seedChecklists(LetterTemplate $template): void
+    {
+        foreach ($template->fieldDefinitions() as $key => $field) {
+            if ($field['type'] !== 'checklist' || blank($field['default'])) {
+                continue;
+            }
+
+            $names = collect(preg_split('/\R/', (string) $field['default']) ?: [])
+                ->map(fn ($line) => trim((string) preg_replace('/^\s*(\d+[.)]|[-*•])\s*/', '', $line)))
+                ->filter()
+                ->unique()
+                ->values();
+
+            $types = RequestedDocumentType::query()->active()->whereIn('name', $names)->pluck('id', 'name');
+
+            foreach ($names as $i => $name) {
+                $this->requestedDocuments()->create([
+                    'field_key' => $key,
+                    'requested_document_type_id' => $types[$name] ?? null,
+                    'name' => $name,
+                    'order' => $i + 1,
+                ]);
+            }
+        }
+    }
+
+    /**
      * The signer list as stored: each slot's chosen signer with their name,
      * title and image copied in, so the record reads on its own.
      *

@@ -106,6 +106,16 @@ class LetterTemplate extends Model
         return $this->hasMany(Letter::class);
     }
 
+    /**
+     * The offer: the template whose issue moves a lead to Proposal. It is
+     * found by what it does rather than by its code, so a renamed or second
+     * offer template still works; the first in the list wins.
+     */
+    public static function offer(): ?self
+    {
+        return self::query()->active()->where('stage_on_issue', 'proposal')->ordered()->first();
+    }
+
     public function scopeActive(Builder $query): Builder
     {
         return $query->where('is_active', true);

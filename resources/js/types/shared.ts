@@ -26,6 +26,8 @@ export type SharedPipeline = {
     services: string[];
     /** Why a lead stops, keyed by the value stored on the record. */
     closeReasons: Record<string, { label: string; hint: string }>;
+    /** Whether signing a lead hands it to Project Management. */
+    handoff: boolean;
 };
 
 export type ContentStatusDef = {

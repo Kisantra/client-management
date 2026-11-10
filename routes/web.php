@@ -9,9 +9,11 @@ use App\Http\Controllers\ContentFieldController;
 use App\Http\Controllers\ContentIdeaController;
 use App\Http\Controllers\ContentStatusController;
 use App\Http\Controllers\DashboardController;
+use App\Http\Controllers\LeadAttachmentController;
 use App\Http\Controllers\LeadClosureController;
 use App\Http\Controllers\LeadController;
 use App\Http\Controllers\LeadFollowUpController;
+use App\Http\Controllers\LeadHandoffController;
 use App\Http\Controllers\LeadNoteController;
 use App\Http\Controllers\LeadStageController;
 use App\Http\Controllers\LetterCancelController;
@@ -55,6 +57,12 @@ Route::middleware(['auth', 'verified'])->group(function () {
         Route::post('/', [LeadController::class, 'update'])->name('leads.update');
 
         Route::post('stage', [LeadStageController::class, 'store'])->name('leads.stage.store');
+        Route::post('serah-terima', [LeadHandoffController::class, 'store'])->name('leads.handoff.store');
+
+        /* Lead files sit on the private disk, so they are opened through here. */
+        Route::get('lampiran/{attachment}', [LeadAttachmentController::class, 'show'])
+            ->whereNumber('attachment')
+            ->name('leads.attachments.show');
 
         Route::post('closure', [LeadClosureController::class, 'store'])->name('leads.closure.store');
         Route::delete('closure', [LeadClosureController::class, 'destroy'])->name('leads.closure.destroy');

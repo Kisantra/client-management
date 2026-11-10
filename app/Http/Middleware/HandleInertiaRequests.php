@@ -9,6 +9,7 @@ use App\Models\Letter;
 use App\Models\User;
 use App\Support\ContentPlan;
 use App\Support\Pipeline;
+use App\Support\ProjectManagement;
 use App\Support\Team;
 use Closure;
 use Illuminate\Http\Request;
@@ -102,6 +103,8 @@ class HandleInertiaRequests extends Middleware
                 'followUpVia' => Pipeline::followUpVia(),
                 'services' => Pipeline::services(),
                 'closeReasons' => Pipeline::closeReasons(),
+                /* Whether signing a lead hands it to Project Management. */
+                'handoff' => ProjectManagement::enabled(),
             ],
 
             /*

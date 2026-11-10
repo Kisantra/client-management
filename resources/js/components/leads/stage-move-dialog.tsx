@@ -1,5 +1,5 @@
 import { router } from '@inertiajs/react';
-import { Check, TriangleAlert } from 'lucide-react';
+import { Check, Send, TriangleAlert } from 'lucide-react';
 import { useState } from 'react';
 import { AttachmentField } from '@/components/leads/attachment-field';
 import type { Attachment } from '@/components/leads/attachment-field';
@@ -13,6 +13,7 @@ import {
     DialogHeader,
     DialogTitle,
 } from '@/components/ui/dialog';
+import { SIGNED_STAGES } from '@/data/leads';
 import { useStageLabels, useStageRequirement } from '@/hooks/use-pipeline';
 import { cn } from '@/lib/utils';
 import { store as moveStage } from '@/routes/leads/stage';
@@ -22,6 +23,9 @@ import { store as moveStage } from '@/routes/leads/stage';
  * is attached, so the record of a proposal or a deal can never be missing the
  * thing that proves it happened. The server enforces the same rule; this only
  * saves the round trip.
+ *
+ * A move that signs the lead also hands it to Project Management, so the
+ * dialog shows what goes across before anyone presses the button.
  */
 export function StageMoveDialog({
     open,
@@ -29,12 +33,15 @@ export function StageMoveDialog({
     toStage,
     leadId,
     company,
+    handover,
 }: {
     open: boolean;
     onOpenChange: (open: boolean) => void;
     toStage: string | null;
     leadId: number;
     company: string;
+    /** What Project Management receives, when this lead is not signed yet. */
+    handover?: { label: string; value: string | null }[];
 }) {
     const [files, setFiles] = useState<Attachment[]>([]);
     const [touched, setTouched] = useState(false);
@@ -46,6 +53,10 @@ export function StageMoveDialog({
 
     const requirement = toStage ? requirementFor(toStage) : undefined;
     const missing = Boolean(requirement) && files.length === 0;
+    const handingOver =
+        handover !== undefined &&
+        toStage !== null &&
+        SIGNED_STAGES.includes(toStage);
 
     const close = (next: boolean) => {
         if (!next) {
@@ -143,6 +154,22 @@ export function StageMoveDialog({
                     </p>
                 )}
 
+                {handingOver ? (
+                    <HandoverSummary
+                        rows={[
+                            ...handover,
+                            ...(requirement
+                                ? [
+                                      {
+                                          label: 'Kontrak',
+                                          value: 'Lampiran di atas',
+                                      },
+                                  ]
+                                : []),
+                        ]}
+                    />
+                ) : null}
+
                 {failed ? <Problem>{failed}</Problem> : null}
 
                 <DialogFooter>
@@ -161,11 +188,51 @@ export function StageMoveDialog({
                         disabled={saving}
                     >
                         <Check strokeWidth={2.5} aria-hidden />
-                        {saving ? 'Memindahkan…' : 'Pindahkan'}
+                        {saving
+                            ? 'Memindahkan…'
+                            : handingOver
+                              ? 'Pindahkan & kirim'
+                              : 'Pindahkan'}
                     </Button>
                 </DialogFooter>
             </DialogContent>
         </Dialog>
+    );
+}
+
+function HandoverSummary({
+    rows,
+}: {
+    rows: { label: string; value: string | null }[];
+}) {
+    return (
+        <div className="rounded-lg bg-primary-soft p-3.5">
+            <p className="flex items-center gap-2 text-[0.8438rem] font-extrabold text-primary-deep">
+                <Send className="size-3.5" strokeWidth={2.5} aria-hidden />
+                Dikirim ke Project Management setelah disimpan
+            </p>
+            <dl className="mt-2.5 grid gap-x-3 gap-y-1.5 text-xs sm:grid-cols-[7rem_1fr]">
+                {rows.map((row) => (
+                    <div key={row.label} className="contents">
+                        <dt className="text-secondary-foreground">
+                            {row.label}
+                        </dt>
+                        <dd className="mb-1 min-w-0 font-semibold break-words sm:mb-0">
+                            {row.value ?? (
+                                <span className="font-normal text-muted-foreground">
+                                    Belum diisi
+                                </span>
+                            )}
+                        </dd>
+                    </div>
+                ))}
+            </dl>
+            <p className="mt-2.5 border-t border-dashed border-chart-3 pt-2.5 text-xs leading-relaxed text-secondary-foreground">
+                Tim pajak mengecek data ini dulu, lalu membuat client dan
+                proyeknya di sana. Tidak dikirim: channel dan sumber, catatan,
+                riwayat follow-up.
+            </p>
+        </div>
     );
 }
 

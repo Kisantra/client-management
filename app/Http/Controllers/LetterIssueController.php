@@ -6,6 +6,7 @@ use App\Models\Lead;
 use App\Models\LeadAttachment;
 use App\Models\LeadStageEvent;
 use App\Models\Letter;
+use App\Support\Attachments;
 use App\Support\LetterNumber;
 use App\Support\LetterPdf;
 use App\Support\LetterRenderer;
@@ -136,7 +137,7 @@ class LetterIssueController extends Controller
         $pdf = LetterPdf::render($letter);
         $path = 'leads/'.$lead->id.'/'.Str::slug(str_replace('/', '-', (string) $letter->number)).'-'.Str::random(6).'.pdf';
 
-        Storage::disk('public')->put($path, $pdf);
+        Storage::disk(Attachments::DISK)->put($path, $pdf);
 
         LeadAttachment::create([
             'lead_id' => $lead->id,

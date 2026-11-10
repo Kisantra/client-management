@@ -59,6 +59,18 @@ return [
     ],
 
     /*
+     | Project Management, the app the tax team runs client work in. A lead
+     | that reaches Deal is handed over there; both apps hold the same token
+     | and present it to each other. Leave either value empty and nothing is
+     | sent and the API below answers 401.
+     */
+    'project_management' => [
+        'url' => env('PROJECT_MANAGEMENT_URL'),
+        'token' => env('PROJECT_MANAGEMENT_TOKEN'),
+        'timeout' => (int) env('PROJECT_MANAGEMENT_TIMEOUT', 10),
+    ],
+
+    /*
      | The team's news pipeline writes every morning into a Google Sheet; the
      | app reads the tab it fills. The sheet is published to the web, so there
      | is no credential here — which also means its sharing setting is the

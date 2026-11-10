@@ -6,6 +6,8 @@ use App\Http\Requests\LeadRequest;
 use App\Models\Content;
 use App\Models\Lead;
 use App\Models\LeadStageEvent;
+use App\Models\Letter;
+use App\Models\LetterTemplate;
 use App\Support\Attachments;
 use App\Support\ContentPlan;
 use App\Support\Pipeline;
@@ -94,12 +96,15 @@ class LeadController extends Controller
             /* Opened from the letter form because the client was not on the
                books yet: saving goes back there with the new client chosen. */
             'after' => $request->query('lanjut') === 'surat' ? 'surat' : null,
+            /* The offer template's name, so the form can offer to open a
+               draft of it straight after saving; null when there is none. */
+            'offer' => LetterTemplate::offer()?->name,
         ]);
     }
 
     public function store(LeadRequest $request)
     {
-        $lead = DB::transaction(function () use ($request) {
+        $saved = DB::transaction(function () use ($request) {
             $lead = Lead::create([
                 ...$request->columns(),
                 'stage_changed_at' => $request->date('entered_at'),
@@ -130,8 +135,24 @@ class LeadController extends Controller
                 Attachments::store($lead, $files, $note);
             }
 
-            return $lead;
+            /* "Simpan & buat penawaran": the offer is drafted in the same
+               breath, so the lead and its first letter land together. */
+            $offer = $request->input('after') === 'penawaran' ? LetterTemplate::offer() : null;
+            $letter = $offer ? Letter::draft($offer, $lead, $request->user()) : null;
+
+            return [$lead, $letter];
         });
+
+        [$lead, $letter] = $saved;
+
+        if ($letter !== null) {
+            $this->toast(
+                $lead->displayName().' tersimpan',
+                'Draft '.$letter->template->name.' sudah dibuat. Isi rinciannya, lalu terbitkan — lead pindah ke Proposal saat surat terbit.',
+            );
+
+            return to_route('letters.show', $letter);
+        }
 
         $this->toast(
             $lead->displayName().' tersimpan',
@@ -147,7 +168,7 @@ class LeadController extends Controller
 
     public function show(Lead $lead): Response
     {
-        $lead->load(['stageEvents', 'notes.attachments', 'followUps']);
+        $lead->load(['stageEvents', 'notes.attachments', 'followUps', 'handoff']);
 
         return Inertia::render('lead-detail', [
             'lead' => [
@@ -168,6 +189,9 @@ class LeadController extends Controller
                 'contentId' => $lead->content_id,
             ],
             'timeline' => $this->timeline($lead),
+            /* Where the client stands in Project Management, once it went
+               over; null for a lead that was never signed. */
+            'handoff' => $lead->handoff?->toPanel(),
             'notes' => $lead->notes->map(fn ($note) => [
                 'id' => $note->id,
                 'author' => $note->author,
