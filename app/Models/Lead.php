@@ -8,6 +8,7 @@ use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
+use Illuminate\Database\Eloquent\Relations\HasOne;
 use Illuminate\Support\Carbon;
 
 class Lead extends Model
@@ -19,6 +20,9 @@ class Lead extends Model
 
     /** Stopped: not won, and no longer expected to move. */
     public const CLOSED = 'tidak_lanjut';
+
+    /** The stages where the client has signed and Project Management takes over. */
+    public const SIGNED = ['deal', 'client'];
 
     protected $guarded = [];
 
@@ -51,6 +55,28 @@ class Lead extends Model
 
             $lead->stalled_at = $changed->copy()->addDays(Pipeline::threshold($lead->stage));
         });
+
+        /*
+         | Signing and un-signing are what Project Management hears about.
+         | The stage dialog, the edit form, an issued letter, closing and
+         | reopening all end in a save, so this is the one place that notices
+         | instead of five that each have to remember. `updated` still has the
+         | old values in getOriginal(), which is what makes the comparison.
+         */
+        static::created(function (Lead $lead) {
+            if ($lead->isSigned()) {
+                Handoff::follow($lead);
+            }
+        });
+
+        static::updated(function (Lead $lead) {
+            $was = $lead->getOriginal('status') !== self::CLOSED
+                && in_array($lead->getOriginal('stage'), self::SIGNED, true);
+
+            if ($was !== $lead->isSigned()) {
+                Handoff::follow($lead);
+            }
+        });
     }
 
     /**
@@ -78,6 +104,7 @@ class Lead extends Model
         return $this->hasMany(LeadFollowUp::class)->orderBy('scheduled_for');
     }
 
+    /** @return HasMany<LeadAttachment, $this> */
     public function attachments(): HasMany
     {
         return $this->hasMany(LeadAttachment::class);
@@ -86,6 +113,12 @@ class Lead extends Model
     public function letters(): HasMany
     {
         return $this->hasMany(Letter::class);
+    }
+
+    /** @return HasOne<Handoff, $this> */
+    public function handoff(): HasOne
+    {
+        return $this->hasOne(Handoff::class);
     }
 
     /** Full display name, e.g. "PT Sinar Rejeki". */
@@ -128,6 +161,12 @@ class Lead extends Model
     public function isClosed(): bool
     {
         return $this->status === self::CLOSED;
+    }
+
+    /** Signed and still on: the client Project Management should be holding. */
+    public function isSigned(): bool
+    {
+        return ! $this->isClosed() && in_array($this->stage, self::SIGNED, true);
     }
 
     /** Only a lead someone is still meant to be working can be stalled. */

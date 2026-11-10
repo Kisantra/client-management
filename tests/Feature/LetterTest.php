@@ -105,6 +105,55 @@ it('starts a draft from a template with the template defaults', function () {
         );
 });
 
+it('saves a new lead and opens a draft offer for it in one step', function () {
+    $this->get(route('leads.create'))
+        ->assertInertia(fn ($page) => $page->where('offer', 'Surat Penawaran Jasa'));
+
+    $response = $this->post(route('leads.store'), [
+        'entity' => 'CV',
+        'company' => 'Karya Makmur',
+        'pic' => 'Budi Santoso',
+        'channel' => 'whatsapp',
+        'source' => 'Chat langsung',
+        'service' => 'PPh Badan',
+        'value' => 25_000_000,
+        'stage' => 'konsultasi',
+        'entered_at' => Carbon::today()->toDateString(),
+        'after' => 'penawaran',
+    ]);
+
+    $lead = Lead::firstWhere('company', 'Karya Makmur');
+    $letter = Letter::firstWhere('lead_id', $lead->id);
+
+    $response->assertRedirect(route('letters.show', $letter));
+
+    expect($letter->template->code)->toBe('penawaran-jasa')
+        ->and($letter->status)->toBe(Letter::DRAFT)
+        // The lead waits at its stage; issuing the offer is what moves it.
+        ->and($lead->stage)->toBe('konsultasi');
+});
+
+it('saves the lead as usual when no offer template is active', function () {
+    LetterTemplate::where('stage_on_issue', 'proposal')->update(['is_active' => false]);
+
+    $this->get(route('leads.create'))
+        ->assertInertia(fn ($page) => $page->where('offer', null));
+
+    $this->post(route('leads.store'), [
+        'entity' => 'CV',
+        'company' => 'Karya Makmur',
+        'pic' => 'Budi Santoso',
+        'channel' => 'whatsapp',
+        'source' => 'Chat langsung',
+        'service' => 'PPh Badan',
+        'stage' => 'lead',
+        'entered_at' => Carbon::today()->toDateString(),
+        'after' => 'penawaran',
+    ])->assertRedirect(route('leads.show', Lead::firstWhere('company', 'Karya Makmur')));
+
+    expect(Letter::count())->toBe(0);
+});
+
 it('refuses a letter to a closed lead', function () {
     $lead = prospect(['status' => Lead::CLOSED, 'closed_at' => Carbon::today()]);
 
@@ -458,7 +507,7 @@ it('returns to the letter form with the new client chosen when the lead was adde
 });
 
 it('moves the lead to Proposal with the PDF attached when an offer is issued', function () {
-    Storage::fake('public');
+    Storage::fake('local');
     $lead = prospect(['stage' => 'kontak', 'stage_changed_at' => Carbon::today()->subDays(4)]);
     $letter = offer($lead);
 
@@ -481,7 +530,7 @@ it('moves the lead to Proposal with the PDF attached when an offer is issued', f
         ->and($attachment->mime)->toBe('application/pdf')
         ->and($attachment->name)->toEndWith('.pdf');
 
-    Storage::disk('public')->assertExists($attachment->path);
+    Storage::disk('local')->assertExists($attachment->path);
 
     // Issued again after a correction: the lead is already there, nothing is filed twice.
     $this->delete(route('letters.issue.destroy', $letter));
@@ -492,7 +541,7 @@ it('moves the lead to Proposal with the PDF attached when an offer is issued', f
 });
 
 it('never moves a lead backwards, a closed lead, or one whose template says nothing', function () {
-    Storage::fake('public');
+    Storage::fake('local');
 
     $signed = prospect(['company' => 'Sudah Deal', 'stage' => 'deal']);
     $this->post(route('letters.issue.store', offer($signed)));

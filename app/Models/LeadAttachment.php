@@ -4,7 +4,6 @@ namespace App\Models;
 
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
-use Illuminate\Support\Facades\Storage;
 
 class LeadAttachment extends Model
 {
@@ -15,6 +14,7 @@ class LeadAttachment extends Model
         return ['size' => 'integer'];
     }
 
+    /** @return BelongsTo<Lead, $this> */
     public function lead(): BelongsTo
     {
         return $this->belongsTo(Lead::class);
@@ -25,8 +25,9 @@ class LeadAttachment extends Model
         return $this->belongsTo(LeadNote::class, 'lead_note_id');
     }
 
+    /** Where a signed-in person opens it. */
     public function url(): string
     {
-        return Storage::disk('public')->url($this->path);
+        return route('leads.attachments.show', [$this->lead_id, $this->id]);
     }
 }

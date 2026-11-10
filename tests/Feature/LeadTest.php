@@ -10,7 +10,7 @@ use Inertia\Inertia;
 
 beforeEach(function () {
     $this->actingAs(User::factory()->create(['name' => 'Admin']));
-    Storage::fake('public');
+    Storage::fake('local');
 });
 
 /** A lead sitting well inside its stage's tolerance. */
@@ -126,7 +126,7 @@ it('stores a lead with its history and first note', function () {
         ->and($lead->notes)->toHaveCount(1)
         ->and($lead->attachments)->toHaveCount(1);
 
-    Storage::disk('public')->assertExists($lead->attachments->first()->path);
+    Storage::disk('local')->assertExists($lead->attachments->first()->path);
 });
 
 it('rejects a lead without the four facts it cannot do without', function () {

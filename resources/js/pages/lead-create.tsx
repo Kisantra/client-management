@@ -11,6 +11,8 @@ type Props = {
     stage: string;
     /** 'surat' when the form was opened from the letter form; saving returns there. */
     after: 'surat' | null;
+    /** The offer template's name, so the form can draft one right after saving. */
+    offer: string | null;
 };
 
 export default function LeadCreate({
@@ -18,6 +20,7 @@ export default function LeadCreate({
     contents,
     stage,
     after,
+    offer,
 }: Props) {
     return (
         <LeadForm
@@ -26,6 +29,7 @@ export default function LeadCreate({
             contents={contents}
             initialStage={stage}
             after={after}
+            offer={offer}
         />
     );
 }

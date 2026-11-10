@@ -1,5 +1,5 @@
 import { Head, Link, router, usePage } from '@inertiajs/react';
-import { ArrowLeft, CalendarDays, Check, Info } from 'lucide-react';
+import { ArrowLeft, CalendarDays, Check, FileText, Info } from 'lucide-react';
 import { useState } from 'react';
 import { toast } from 'sonner';
 import { AttachmentField } from '@/components/leads/attachment-field';
@@ -11,6 +11,7 @@ import type { OfficePoint } from '@/components/leads/office-map';
 import { STAGE_DOT } from '@/components/leads/stage-mark';
 import { Button } from '@/components/ui/button';
 import { Calendar } from '@/components/ui/calendar';
+import { Checkbox } from '@/components/ui/checkbox';
 import { Input } from '@/components/ui/input';
 import {
     Popover,
@@ -116,6 +117,7 @@ export function LeadForm({
     contents,
     initialStage = 'lead',
     after = null,
+    offer = null,
 }: {
     lead: EditableLead | null;
     services: string[];
@@ -125,6 +127,8 @@ export function LeadForm({
     initialStage?: string;
     /** 'surat' when opened from the letter form: saving goes back there. */
     after?: 'surat' | null;
+    /** The offer template's name, when one exists to draft after saving. */
+    offer?: string | null;
 }) {
     const { stages } = usePipeline();
     const stageLabels = useStageLabels();
@@ -175,6 +179,7 @@ export function LeadForm({
     const [dateOpen, setDateOpen] = useState(false);
 
     const [stage, setStage] = useState(lead?.stage ?? initialStage);
+    const [thenOffer, setThenOffer] = useState(false);
     const [owner, setOwner] = useState(lead?.owner ?? '');
 
     const [errors, setErrors] = useState<Errors>({});
@@ -201,13 +206,29 @@ export function LeadForm({
         : creatingClient
           ? 'Client'
           : 'Leads';
+    /*
+     | An offer goes to someone not yet sent one: a new lead still before
+     | Proposal. Issuing it is what moves the lead there, so starting the lead
+     | at Proposal or later would leave the offer with nothing to do.
+     */
+    const stageIndex = stages.findIndex((item) => item.key === stage);
+    const proposalIndex = stages.findIndex((item) => item.key === 'proposal');
+    const canOffer =
+        !lead &&
+        after !== 'surat' &&
+        offer !== null &&
+        stageIndex < proposalIndex;
+    const offering = canOffer && thenOffer;
+
     const saveLabel = saving
         ? 'Menyimpan…'
-        : lead
-          ? 'Simpan Perubahan'
-          : creatingClient
-            ? 'Simpan Client'
-            : 'Simpan Lead';
+        : offering
+          ? 'Simpan & buat penawaran'
+          : lead
+            ? 'Simpan Perubahan'
+            : creatingClient
+              ? 'Simpan Client'
+              : 'Simpan Lead';
 
     /*
      | The source is picked, not typed: a published piece from the calendar,
@@ -304,7 +325,7 @@ export function LeadForm({
             stage,
             owner: owner.trim(),
             files: attachments.map((item) => item.file),
-            after: after ?? '',
+            after: offering ? 'penawaran' : (after ?? ''),
         };
 
         router.post(
@@ -948,6 +969,34 @@ export function LeadForm({
                                     </SelectContent>
                                 </Select>
                             </Field>
+
+                            {canOffer ? (
+                                <label className="flex items-start gap-3 rounded-lg bg-primary-soft p-3.5 sm:col-span-2">
+                                    <Checkbox
+                                        checked={thenOffer}
+                                        onCheckedChange={(checked) =>
+                                            setThenOffer(checked === true)
+                                        }
+                                        className="mt-0.5 bg-card"
+                                    />
+                                    <span className="min-w-0">
+                                        <span className="flex items-center gap-1.5 text-[0.8438rem] font-bold text-primary-deep">
+                                            <FileText
+                                                className="size-3.5"
+                                                strokeWidth={2.5}
+                                                aria-hidden
+                                            />
+                                            Langsung buat {offer}
+                                        </span>
+                                        <span className="mt-1 block text-xs leading-relaxed text-secondary-foreground">
+                                            Setelah disimpan, draft suratnya
+                                            langsung dibuka dengan client ini.
+                                            Begitu surat terbit, lead pindah ke
+                                            Proposal dengan PDF-nya terlampir.
+                                        </span>
+                                    </span>
+                                </label>
+                            ) : null}
                         </FormSection>
                     </div>
 
@@ -1067,9 +1116,11 @@ export function LeadForm({
                             <p className="mt-4 border-t border-border pt-3.5 text-xs leading-relaxed text-muted-foreground">
                                 {lead
                                     ? 'Perubahan berlaku begitu disimpan, termasuk di papan dan dashboard.'
-                                    : creatingClient
-                                      ? 'Setelah disimpan, client langsung tampil di daftar Client dan ikut terhitung di dashboard.'
-                                      : 'Setelah disimpan, lead langsung masuk ke papan dan ikut terhitung di dashboard.'}
+                                    : offering
+                                      ? `Setelah disimpan, lead masuk ke papan dan draft ${offer} langsung dibuka.`
+                                      : creatingClient
+                                        ? 'Setelah disimpan, client langsung tampil di daftar Client dan ikut terhitung di dashboard.'
+                                        : 'Setelah disimpan, lead langsung masuk ke papan dan ikut terhitung di dashboard.'}
                             </p>
                         </div>
                     </aside>

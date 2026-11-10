@@ -77,6 +77,28 @@ export type LeadDetail = Lead & {
     contentId: number | null;
 };
 
+/** The stages where the client has signed and Project Management takes over. */
+export const SIGNED_STAGES = ['deal', 'client'];
+
+/** Where a signed client stands in Project Management. */
+export type Handoff = {
+    status: 'antre' | 'terkirim' | 'lengkap' | 'batal' | 'gagal';
+    /** Project Management already had this client; the deal joined it. */
+    matched: boolean;
+    clientUrl: string | null;
+    /** The project the tax team opened for this deal. */
+    projectName: string | null;
+    projectUrl: string | null;
+    sentAt: string | null;
+    completedAt: string | null;
+    completedBy: string | null;
+    withdrawnAt: string | null;
+    error: string | null;
+    attempts: number;
+    /** Out of automatic tries: only the button sends it again. */
+    exhausted: boolean;
+};
+
 export type StageStep = {
     key: string;
     label: string;
