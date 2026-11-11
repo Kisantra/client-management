@@ -76,10 +76,15 @@ export default function OfficeMapLeaflet({
                     attributionControl={false}
                     className="size-full"
                 >
+                    {/* OpenStreetMap refuses tiles asked for without a Referer.
+                        The server sends Referrer-Policy: same-origin for every
+                        page, which strips it on these cross-site requests, so
+                        the tiles name this site's origin on their own. */}
                     <TileLayer
                         attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>'
                         url="https://tile.openstreetmap.org/{z}/{x}/{y}.png"
                         maxZoom={19}
+                        referrerPolicy="strict-origin-when-cross-origin"
                     />
                     {readOnly ? null : <ClickToPlace onPick={onChange} />}
                     {point ? (
