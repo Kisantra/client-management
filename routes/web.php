@@ -79,6 +79,7 @@ Route::middleware(['auth', 'verified'])->group(function () {
     });
 
     Route::get('clients', [ClientController::class, 'index'])->name('clients');
+    Route::delete('clients', [ClientController::class, 'destroy'])->name('clients.destroy');
     Route::get('content', [ContentController::class, 'index'])->name('content');
     Route::post('content', [ContentController::class, 'store'])->name('content.store');
     Route::get('content/create', [ContentController::class, 'create'])->name('content.create');

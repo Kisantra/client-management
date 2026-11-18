@@ -1,7 +1,6 @@
 import type { ReactNode } from 'react';
 import type { ClientSummary } from '@/data/clients';
 import { shortRupiah } from '@/data/leads';
-import { cn } from '@/lib/utils';
 
 /**
  * The page's four figures on one ruled line, each beside the quantity it is
@@ -10,20 +9,16 @@ import { cn } from '@/lib/utils';
  */
 export function ClientLedger({
     summary,
-    threshold,
-    stageLabels,
-    onNeedsContact,
+    endingSoonDays,
+    onContracts,
 }: {
     summary: ClientSummary;
-    /** Days without contact after which a client counts as due a call. */
-    /** Days without contact each stage tolerates, keyed by stage. */
-    threshold: Record<string, number>;
-    stageLabels: Record<string, string>;
-    /** Turns the list into the call sheet: longest unspoken-to first. */
-    onNeedsContact: () => void;
+    /** Days before its end that a contract counts as running out. */
+    endingSoonDays: number;
+    /** Orders the list by the contract that runs out first. */
+    onContracts: () => void;
 }) {
     const { count } = summary;
-    const due = summary.needsContact;
 
     return (
         <section
@@ -89,21 +84,22 @@ export function ClientLedger({
             />
 
             <Figure
-                label="Perlu disapa"
-                value={due}
-                alarm={due > 0}
+                label="Kontrak berjangka"
+                value={summary.contracted}
                 caption={
                     <>
-                        lewat batas tahapnya —{' '}
-                        {Object.entries(threshold)
-                            .map(
-                                ([stage, days]) =>
-                                    `${stageLabels[stage] ?? stage} ${days} hari`,
-                            )
-                            .join(' · ')}
+                        {summary.expired > 0 ? (
+                            <span className="font-semibold text-destructive">
+                                <span data-numeric>{summary.expired}</span>{' '}
+                                sudah habis ·{' '}
+                            </span>
+                        ) : null}
+                        <span data-numeric>{summary.endingSoon}</span> habis
+                        dalam {endingSoonDays} hari ·{' '}
+                        <span data-numeric>{summary.onSpot}</span> on spot
                     </>
                 }
-                onClick={due > 0 ? onNeedsContact : undefined}
+                onClick={summary.contracted > 0 ? onContracts : undefined}
             />
         </section>
     );
@@ -113,14 +109,11 @@ function Figure({
     label,
     value,
     caption,
-    alarm = false,
     onClick,
 }: {
     label: string;
     value: ReactNode;
     caption: ReactNode;
-    /** Red only for a breach: clients going unspoken-to, never a plain total. */
-    alarm?: boolean;
     onClick?: () => void;
 }) {
     const body = (
@@ -129,10 +122,7 @@ function Figure({
                 {label}
             </span>
             <span
-                className={cn(
-                    'mt-2 block text-[1.5rem] leading-none font-extrabold tracking-[-0.03em]',
-                    alarm && 'text-destructive',
-                )}
+                className="mt-2 block text-[1.5rem] leading-none font-extrabold tracking-[-0.03em]"
                 data-numeric
             >
                 {value}
@@ -152,7 +142,7 @@ function Figure({
             >
                 {body}
                 <span className="sr-only">
-                    Urutkan daftar dari yang paling lama tidak dihubungi
+                    Urutkan daftar dari kontrak yang paling dekat habis
                 </span>
             </button>
         );

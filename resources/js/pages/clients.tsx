@@ -1,5 +1,5 @@
 import { Head, Link, router } from '@inertiajs/react';
-import { Briefcase, Plus, Search, X } from 'lucide-react';
+import { Briefcase, Plus, Search, Trash2, X } from 'lucide-react';
 import { useRef, useState } from 'react';
 import { ClientLedger } from '@/components/clients/client-ledger';
 import { ClientsTable } from '@/components/clients/clients-table';
@@ -9,6 +9,7 @@ import { ShareList } from '@/components/clients/share-list';
 import { CountChip } from '@/components/count-chip';
 import { Panel } from '@/components/dashboard/panel';
 import { FilterSelect } from '@/components/filter-select';
+import { ConfirmDialog } from '@/components/letters/confirm-dialog';
 import { ListPager } from '@/components/list-pager';
 import { Button } from '@/components/ui/button';
 import type {
@@ -19,11 +20,12 @@ import type {
 } from '@/data/clients';
 import { rupiah } from '@/data/leads';
 import { clients } from '@/routes';
+import { destroy as clientsDestroy } from '@/routes/clients';
 import { create as leadsCreate } from '@/routes/leads';
 
 const SORTS: { key: ClientSort; label: string }[] = [
     { key: 'sejak', label: 'Paling baru jadi client' },
-    { key: 'kontak', label: 'Paling lama tak dihubungi' },
+    { key: 'kontrak', label: 'Kontrak paling dekat habis' },
     { key: 'nilai', label: 'Nilai terbesar' },
     { key: 'nama', label: 'Nama A–Z' },
 ];
@@ -41,10 +43,8 @@ type Props = {
     filters: Filters;
     /** Active clients before any filter: decides which empty state shows. */
     total: number;
-    /** Days without contact after which a client counts as due a call. */
-    /** Days without contact each stage tolerates, keyed by stage. */
-    contactThreshold: Record<string, number>;
-    stageLabels: Record<string, string>;
+    /** Days before its end that a contract counts as running out. */
+    endingSoonDays: number;
     summary: ClientSummary;
     channels: Share[];
     owners: Share[];
@@ -74,8 +74,7 @@ const addClient = leadsCreate({ query: { tahap: 'client' } });
 export default function Clients({
     filters,
     total,
-    contactThreshold,
-    stageLabels,
+    endingSoonDays,
     summary,
     channels,
     owners,
@@ -87,7 +86,52 @@ export default function Clients({
     const [query, setQuery] = useState(filters.q);
     const typing = useRef<ReturnType<typeof setTimeout> | null>(null);
 
+    /*
+     | Picked for deletion, on this page only: a filter or page change starts
+     | the pick again, so nothing out of sight is ever deleted by surprise.
+     */
+    const [selected, setSelected] = useState<Set<number>>(() => new Set());
+    /* What the dialog asks about, fixed when it opens: clearing the pick on
+       success must not rewrite it to "0 client" while it fades out. */
+    const [doomed, setDoomed] = useState<Client[]>([]);
+    const [confirming, setConfirming] = useState(false);
+    const [deleting, setDeleting] = useState(false);
+
+    const pickable = rows.data.filter((client) => client.locked === null);
+    const picked = pickable.filter((client) => selected.has(client.id));
+
+    const toggle = (id: number) =>
+        setSelected((current) => {
+            const next = new Set(current);
+
+            if (!next.delete(id)) {
+                next.add(id);
+            }
+
+            return next;
+        });
+
+    const toggleAll = (pick: boolean) =>
+        setSelected(
+            pick ? new Set(pickable.map((client) => client.id)) : new Set(),
+        );
+
+    const remove = () => {
+        router.delete(clientsDestroy().url, {
+            data: { ids: doomed.map((client) => client.id) },
+            preserveScroll: true,
+            onStart: () => setDeleting(true),
+            onFinish: () => setDeleting(false),
+            onSuccess: () => {
+                setSelected(new Set());
+                setConfirming(false);
+            },
+        });
+    };
+
     const go = (patch: Record<string, string | number | null>) => {
+        setSelected(new Set());
+
         const next: Record<string, string> = {
             q: query,
             layanan: filters.layanan,
@@ -136,6 +180,7 @@ export default function Clients({
 
     const reset = () => {
         setQuery('');
+        setSelected(new Set());
         router.get(clients.url(), {}, { preserveScroll: true, replace: true });
     };
 
@@ -170,13 +215,11 @@ export default function Clients({
                                     </>
                                 ) : null}
                             </span>
-                            {summary.needsContact > 0 ? (
+                            {summary.expired > 0 ? (
                                 <span className="font-semibold text-destructive">
                                     ·{' '}
-                                    <span data-numeric>
-                                        {summary.needsContact}
-                                    </span>{' '}
-                                    perlu disapa
+                                    <span data-numeric>{summary.expired}</span>{' '}
+                                    kontrak sudah habis
                                 </span>
                             ) : null}
                             <span
@@ -198,9 +241,8 @@ export default function Clients({
 
                 <ClientLedger
                     summary={summary}
-                    threshold={contactThreshold}
-                    stageLabels={stageLabels}
-                    onNeedsContact={() => go({ urut: 'kontak' })}
+                    endingSoonDays={endingSoonDays}
+                    onContracts={() => go({ urut: 'kontrak' })}
                 />
 
                 {/* Channel chips double as the read of where clients come from:
@@ -302,16 +344,10 @@ export default function Clients({
                             className="size-1.5 rounded-full bg-destructive"
                             aria-hidden
                         />
-                        Angka merah
+                        Tanda merah
                     </span>{' '}
-                    = belum dihubungi lebih lama dari batas tahapnya —{' '}
-                    {Object.entries(contactThreshold)
-                        .map(
-                            ([stage, days]) =>
-                                `${stageLabels[stage] ?? stage} ${days} hari`,
-                        )
-                        .join(' · ')}
-                    .
+                    = kontraknya sudah lewat tanggal berakhir. Client tanpa
+                    durasi kontrak tercatat sebagai on spot.
                 </p>
 
                 {total === 0 ? (
@@ -329,6 +365,10 @@ export default function Clients({
                                 rows={rows.data}
                                 sort={filters.urut}
                                 onSort={(urut) => go({ urut })}
+                                endingSoonDays={endingSoonDays}
+                                selected={selected}
+                                onToggle={toggle}
+                                onToggleAll={toggleAll}
                             />
                         </div>
 
@@ -365,6 +405,76 @@ export default function Clients({
                         </div>
                     </section>
                 )}
+
+                {/* Below the list, held to the bottom of the screen while the
+                    list scrolls under it: placed above, it would push the rows
+                    down the moment the first one is picked. */}
+                {picked.length > 0 ? (
+                    <div className="sticky bottom-[max(1rem,env(safe-area-inset-bottom))] z-30 -mt-2 flex justify-center">
+                        <div
+                            role="region"
+                            aria-label="Client terpilih"
+                            className="flex flex-wrap items-center justify-center gap-x-4 gap-y-2 rounded-xl border border-border bg-card py-2.5 pr-2.5 pl-4 shadow-lift"
+                        >
+                            <p className="text-[0.8438rem] font-bold">
+                                <span data-numeric>{picked.length}</span> client
+                                dipilih
+                                {picked.length < pickable.length ? (
+                                    <button
+                                        type="button"
+                                        onClick={() => toggleAll(true)}
+                                        className="ml-3 font-semibold text-primary-deep underline decoration-transparent underline-offset-4 transition-colors hover:decoration-current"
+                                    >
+                                        Pilih semua di halaman ini
+                                    </button>
+                                ) : null}
+                            </p>
+                            <div className="flex gap-2">
+                                <Button
+                                    type="button"
+                                    variant="ghost"
+                                    size="sm"
+                                    onClick={() => toggleAll(false)}
+                                >
+                                    Batal pilih
+                                </Button>
+                                {/* Ink to start it; red waits in the dialog,
+                                    on the step that destroys. */}
+                                <Button
+                                    type="button"
+                                    size="sm"
+                                    onClick={() => {
+                                        setDoomed(picked);
+                                        setConfirming(true);
+                                    }}
+                                    className="bg-ink-panel text-white hover:bg-ink-panel/90"
+                                >
+                                    <Trash2 strokeWidth={2} aria-hidden />
+                                    Hapus
+                                </Button>
+                            </div>
+                        </div>
+                    </div>
+                ) : null}
+
+                <ConfirmDialog
+                    open={confirming}
+                    onOpenChange={setConfirming}
+                    title={`Hapus ${doomed.length} client?`}
+                    description="Beserta catatan, lampiran, follow-up, riwayat tahap, dan draft suratnya. Penghapusan ini permanen dan tidak bisa dibatalkan."
+                    action={`Hapus ${doomed.length} client`}
+                    busy={deleting}
+                    destructive
+                    onConfirm={remove}
+                >
+                    <ul className="flex max-h-48 flex-col gap-1 overflow-y-auto rounded-lg bg-neutral-soft p-3 text-[0.8438rem] font-semibold">
+                        {doomed.map((client) => (
+                            <li key={client.id} className="truncate">
+                                {client.company}
+                            </li>
+                        ))}
+                    </ul>
+                </ConfirmDialog>
 
                 {/* The evaluation lens, after the day's work: which content
                     ended in a client, and who is holding them. */}

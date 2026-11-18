@@ -3,11 +3,15 @@
 namespace App\Http\Controllers;
 
 use App\Models\Lead;
+use App\Support\Attachments;
 use App\Support\Pipeline;
 use Illuminate\Database\Eloquent\Builder;
+use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Collection;
+use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Storage;
 use Inertia\Inertia;
 use Inertia\Response;
 
@@ -17,9 +21,11 @@ use Inertia\Response;
  * Two stages qualify — a lead that has dealt and one already running as an
  * active client — because the money is committed at the deal and the team
  * treats it as theirs from that moment. The two are never merged into one
- * word, though: a deal row says so on its face, the conversion figure counts
- * only the ones that actually converted, and each row is measured against the
- * contact tolerance of its own stage, not a shared one.
+ * word, though: a deal row says so on its face, and the conversion figure
+ * counts only the ones that actually converted.
+ *
+ * Both are under contract, so nobody here is chased for a last contact; what
+ * the list watches instead is when each contract runs out.
  *
  * There is no second record. A client is a lead standing in one of those two
  * stages, so every figure here is read from the leads table and the stage move
@@ -35,6 +41,9 @@ class ClientController extends Controller
     /** The pj filter value that means nobody has been assigned yet. */
     public const UNASSIGNED = 'tanpa';
 
+    /** Days before its end that a contract counts as running out. */
+    private const ENDING_SOON_DAYS = 30;
+
     private const MONTHS = [
         'Jan', 'Feb', 'Mar', 'Apr', 'Mei', 'Jun',
         'Jul', 'Agu', 'Sep', 'Okt', 'Nov', 'Des',
@@ -44,27 +53,13 @@ class ClientController extends Controller
     {
         $filters = $this->filters($request);
 
-        /*
-         | Somebody nobody has spoken to for longer than their own stage
-         | tolerates is due a call. A deal is given five days and a running
-         | client thirty, both read from config/pipeline.php — the same numbers
-         | that mark a lead mandek on the Leads page. One shared figure would
-         | have let a signed deal go three weeks unanswered and still look fine.
-         */
-        $threshold = collect(self::STAGES)
-            ->mapWithKeys(fn (string $stage) => [$stage => Pipeline::threshold($stage)])
-            ->all();
-
         $matching = $this->matching($filters);
 
         return Inertia::render('clients', [
             'filters' => $filters,
             'total' => $this->base()->count(),
-            'contactThreshold' => $threshold,
-            'stageLabels' => collect(self::STAGES)
-                ->mapWithKeys(fn (string $stage) => [$stage => Pipeline::label($stage)])
-                ->all(),
-            'summary' => $this->summary(clone $matching, $threshold),
+            'endingSoonDays' => self::ENDING_SOON_DAYS,
+            'summary' => $this->summary(clone $matching),
             /*
              | The rails count under every filter except their own, so picking
              | a channel or a person never hides the size of the ones not picked.
@@ -73,8 +68,52 @@ class ClientController extends Controller
             'owners' => $this->owners($this->matching($filters, except: 'pj')),
             'sources' => $this->sources(clone $matching),
             'services' => $this->base()->distinct()->orderBy('service')->pluck('service')->all(),
-            'rows' => $this->page(clone $matching, $filters, $threshold),
+            'rows' => $this->page(clone $matching, $filters),
         ]);
+    }
+
+    /**
+     * Deletes the picked clients, and everything filed under them.
+     *
+     * One that cannot go is passed over rather than failing the batch, and
+     * the toast names it, so the rest of the pick is not held hostage.
+     */
+    public function destroy(Request $request): RedirectResponse
+    {
+        $validated = $request->validate([
+            'ids' => ['required', 'array', 'min:1', 'max:100'],
+            'ids.*' => ['integer'],
+        ], [
+            'ids.required' => 'Pilih client yang mau dihapus.',
+        ]);
+
+        [$blocked, $deletable] = $this->base()
+            ->withDeletionFacts()
+            ->whereIn('id', $validated['ids'])
+            ->get()
+            ->partition(fn (Lead $lead) => $lead->deletionBlocker() !== null);
+
+        // Notes, follow-ups, drafts and the stage history go with it by cascade.
+        DB::transaction(fn () => $deletable->each->delete());
+
+        // Files after the rows, so a delete that rolled back never loses evidence.
+        foreach ($deletable as $lead) {
+            Storage::disk(Attachments::DISK)->deleteDirectory('leads/'.$lead->id);
+        }
+
+        $skipped = $blocked
+            ->map(fn (Lead $lead) => $lead->displayName().': '.$lead->deletionBlocker())
+            ->implode(' ');
+
+        $this->toast(
+            $deletable->isEmpty() ? 'Tidak ada client yang dihapus' : $deletable->count().' client dihapus',
+            $blocked->isEmpty()
+                ? 'Beserta catatan, lampiran, follow-up, dan draft suratnya.'
+                : $blocked->count().' dilewati. '.$skipped,
+            $blocked->isEmpty() ? 'success' : 'warning',
+        );
+
+        return back();
     }
 
     /**
@@ -85,7 +124,7 @@ class ClientController extends Controller
     private function filters(Request $request): array
     {
         $channels = array_keys(Pipeline::channels());
-        $sorts = ['sejak', 'kontak', 'nilai', 'nama'];
+        $sorts = ['sejak', 'kontrak', 'nilai', 'nama'];
 
         $pick = function (string $key) use ($request): string {
             $value = mb_substr(trim((string) $request->query($key, '')), 0, 80);
@@ -156,13 +195,15 @@ class ClientController extends Controller
      * @param  Builder<Lead>  $matching
      * @return array<string, int|string|null>
      */
-    private function summary(Builder $matching, array $threshold): array
+    private function summary(Builder $matching): array
     {
         $today = Carbon::today();
         $thisMonth = $today->copy()->startOfMonth();
         $lastMonth = $thisMonth->copy()->subMonth();
+        $soon = $today->copy()->addDays(self::ENDING_SOON_DAYS);
 
-        $rows = (clone $matching)->get(['stage', 'entered_at', 'stage_changed_at', 'value']);
+        $rows = (clone $matching)->get(['stage', 'entered_at', 'stage_changed_at', 'value', 'contract_ends_at']);
+        $contracted = $rows->filter(fn (Lead $lead) => $lead->contract_ends_at !== null);
         $count = $rows->count();
         $value = (int) $rows->sum(fn (Lead $lead) => $lead->value);
 
@@ -197,29 +238,15 @@ class ClientController extends Controller
             'medianDays' => $conversion->isEmpty() ? null : $this->median($conversion),
             'fastestDays' => $conversion->isEmpty() ? null : (int) $conversion->first(),
             'convertedCount' => $conversion->count(),
-            'needsContact' => $this->needingContact(clone $matching, $threshold)->count(),
+            'contracted' => $contracted->count(),
+            'onSpot' => $count - $contracted->count(),
+            'endingSoon' => $contracted
+                ->filter(fn (Lead $lead) => $lead->contract_ends_at->betweenIncluded($today, $soon))
+                ->count(),
+            'expired' => $contracted
+                ->filter(fn (Lead $lead) => $lead->contract_ends_at->lt($today))
+                ->count(),
         ];
-    }
-
-    /**
-     * Clients whose last contact is older than the stage tolerates.
-     *
-     * @param  Builder<Lead>  $query
-     * @param  array<string, int>  $threshold
-     * @return Builder<Lead>
-     */
-    private function needingContact(Builder $query, array $threshold): Builder
-    {
-        return $query->where(function (Builder $group) use ($threshold) {
-            foreach ($threshold as $stage => $days) {
-                $group->orWhere(fn (Builder $one) => $one
-                    ->where('stage', $stage)
-                    ->whereRaw(
-                        'date(coalesce(last_contact_at, entered_at)) < ?',
-                        [Carbon::today()->subDays($days)->toDateString()],
-                    ));
-            }
-        });
     }
 
     /**
@@ -323,15 +350,15 @@ class ClientController extends Controller
      * @param  array<string, string>  $filters
      * @return array<string, mixed>
      */
-    private function page(Builder $query, array $filters, array $threshold): array
+    private function page(Builder $query, array $filters): array
     {
-        $page = $this->sorted($query, $filters['urut'])
+        $page = $this->sorted($query->withDeletionFacts(), $filters['urut'])
             ->paginate(self::PER_PAGE)
             ->withQueryString();
 
         return [
             'data' => collect($page->items())
-                ->map(fn (Lead $lead) => $this->row($lead, $threshold))
+                ->map(fn (Lead $lead) => $this->row($lead))
                 ->all(),
             'from' => $page->firstItem() ?? 0,
             'to' => $page->lastItem() ?? 0,
@@ -350,8 +377,8 @@ class ClientController extends Controller
         return match ($sort) {
             'nama' => $query->orderBy('entity')->orderBy('company'),
             'nilai' => $query->orderByDesc('value')->orderBy('company'),
-            // Longest unspoken-to first: sorted this way, the list is the call sheet.
-            'kontak' => $query->orderByRaw('coalesce(last_contact_at, entered_at)')->orderBy('company'),
+            // Soonest to run out first, on-spot clients after every contract.
+            'kontrak' => $query->orderByRaw('contract_ends_at is null')->orderBy('contract_ends_at')->orderBy('company'),
             default => $query->orderByDesc('stage_changed_at')->orderByDesc('id'),
         };
     }
@@ -361,7 +388,7 @@ class ClientController extends Controller
      *
      * @return array<string, mixed>
      */
-    private function row(Lead $lead, array $threshold): array
+    private function row(Lead $lead): array
     {
         return [
             ...$lead->toRow(),
@@ -375,7 +402,9 @@ class ClientController extends Controller
             'daysToConvert' => $lead->stage === 'client'
                 ? $this->daysToConvert($lead)
                 : null,
-            'needsContact' => $lead->daysSinceContact() > ($threshold[$lead->stage] ?? 30),
+            'contract' => $lead->contract(),
+            // Why the checkbox is off, or null when it can be picked for deletion.
+            'locked' => $lead->deletionBlocker(),
         ];
     }
 

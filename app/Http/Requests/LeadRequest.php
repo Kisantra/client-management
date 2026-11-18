@@ -39,6 +39,9 @@ class LeadRequest extends FormRequest
 
             'service' => ['required', 'string', 'max:80'],
             'value' => ['nullable', 'integer', 'min:0', 'max:1000000000000'],
+            // Empty for a client engaged on the spot, with no term to run out.
+            'contract_months' => ['nullable', 'integer', 'min:1', 'max:120'],
+            'contract_start' => ['nullable', 'date', 'required_with:contract_months'],
             'note' => ['nullable', 'string', 'max:2000'],
 
             'stage' => ['required', Rule::in(Pipeline::keys())],
@@ -59,6 +62,9 @@ class LeadRequest extends FormRequest
             'service.required' => 'Pilih layanan yang ditanyakan.',
             'email.email' => 'Format email belum benar.',
             'entered_at.before_or_equal' => 'Tanggal masuk tidak boleh di masa depan.',
+            'contract_months.min' => 'Durasi kontrak minimal 1 bulan.',
+            'contract_months.max' => 'Durasi kontrak maksimal 120 bulan.',
+            'contract_start.required_with' => 'Pilih tanggal mulai kontraknya.',
             'files.*.max' => 'Ukuran berkas maksimal 10 MB.',
             'files.*.mimes' => 'Berkas harus JPG, PNG, WebP, atau PDF.',
         ];
@@ -70,6 +76,8 @@ class LeadRequest extends FormRequest
         return collect($this->validated())
             ->except(['files', 'note'])
             ->put('value', (int) $this->input('value', 0))
+            // A start date means nothing without a term to start.
+            ->put('contract_start', $this->filled('contract_months') ? $this->date('contract_start') : null)
             ->all();
     }
 }

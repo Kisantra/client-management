@@ -2,36 +2,71 @@ import { Link } from '@inertiajs/react';
 import { ChevronRight } from 'lucide-react';
 import { ChannelIcon } from '@/components/leads/channel-icon';
 import { SortHead } from '@/components/sort-head';
+import { Checkbox } from '@/components/ui/checkbox';
 import type { Client } from '@/data/clients';
 import { CHANNEL_LABELS } from '@/data/dashboard';
-import { entryDate, relativeDays, shortRupiah } from '@/data/leads';
+import { contractLength, entryDate, shortRupiah } from '@/data/leads';
 import { useInitials } from '@/hooks/use-initials';
 import { rowLink } from '@/lib/row-link';
+import { cn } from '@/lib/utils';
 import { show as leadShow } from '@/routes/leads';
 
-export type ClientSort = 'sejak' | 'kontak' | 'nilai' | 'nama';
+export type ClientSort = 'sejak' | 'kontrak' | 'nilai' | 'nama';
 
 type Props = {
     rows: Client[];
     sort: ClientSort;
     onSort: (sort: ClientSort) => void;
+    /** Days before its end that a contract reads as running out. */
+    endingSoonDays: number;
+    selected: Set<number>;
+    onToggle: (id: number) => void;
+    /** Picks or clears every row on this page that can be picked. */
+    onToggleAll: (pick: boolean) => void;
 };
 
-export function ClientsTable({ rows, sort, onSort }: Props) {
+export function ClientsTable({
+    rows,
+    sort,
+    onSort,
+    endingSoonDays,
+    selected,
+    onToggle,
+    onToggleAll,
+}: Props) {
     const initials = useInitials();
+
+    const pickable = rows.filter((client) => client.locked === null);
+    const picked = pickable.filter((client) => selected.has(client.id)).length;
 
     return (
         <>
-            {/* Table at reading width; six columns are unusable on a phone. */}
+            {/* Table at reading width; seven columns are unusable on a phone. */}
             <div className="hidden lg:block">
                 <table className="w-full border-collapse text-left">
                     <caption className="sr-only">
                         Daftar client aktif beserta layanan, asal konten, nilai
-                        kerja sama, sejak kapan menjadi client, dan kontak
-                        terakhir.
+                        kerja sama, sejak kapan menjadi client, dan masa
+                        kontraknya.
                     </caption>
                     <thead>
                         <tr className="group/head border-b border-border text-[0.6875rem] font-bold tracking-[0.08em] text-muted-foreground uppercase">
+                            <th scope="col" className="w-8 py-3 pr-3">
+                                <Checkbox
+                                    checked={
+                                        picked === 0
+                                            ? false
+                                            : picked === pickable.length
+                                              ? true
+                                              : 'indeterminate'
+                                    }
+                                    onCheckedChange={(checked) =>
+                                        onToggleAll(checked === true)
+                                    }
+                                    disabled={pickable.length === 0}
+                                    aria-label="Pilih semua client di halaman ini"
+                                />
+                            </th>
                             <SortHead
                                 label="Client"
                                 column="nama"
@@ -56,8 +91,8 @@ export function ClientsTable({ rows, sort, onSort }: Props) {
                                 align="right"
                             />
                             <SortHead
-                                label="Kontak terakhir"
-                                column="kontak"
+                                label="Kontrak"
+                                column="kontrak"
                                 sort={sort}
                                 onSort={onSort}
                                 align="right"
@@ -72,8 +107,20 @@ export function ClientsTable({ rows, sort, onSort }: Props) {
                             <tr
                                 key={client.id}
                                 {...rowLink(leadShow(client.id))}
-                                className="cursor-pointer border-b border-border text-[0.8438rem] transition-colors last:border-b-0 hover:bg-neutral-soft"
+                                className={cn(
+                                    'cursor-pointer border-b border-border text-[0.8438rem] transition-colors last:border-b-0 hover:bg-neutral-soft',
+                                    selected.has(client.id) &&
+                                        'bg-primary-soft/50',
+                                )}
                             >
+                                <td className="w-8 pr-3">
+                                    <PickBox
+                                        client={client}
+                                        checked={selected.has(client.id)}
+                                        onToggle={onToggle}
+                                        className="py-3"
+                                    />
+                                </td>
                                 <th
                                     scope="row"
                                     className="max-w-[18rem] py-3 pr-4 text-left font-normal"
@@ -129,7 +176,10 @@ export function ClientsTable({ rows, sort, onSort }: Props) {
                                     </span>
                                 </td>
                                 <td className="py-3 pr-4 text-right whitespace-nowrap">
-                                    <ContactMark client={client} />
+                                    <ContractMark
+                                        client={client}
+                                        endingSoonDays={endingSoonDays}
+                                    />
                                 </td>
                                 <td className="py-3 pl-6 whitespace-nowrap">
                                     {client.owner ? (
@@ -154,14 +204,27 @@ export function ClientsTable({ rows, sort, onSort }: Props) {
                 </table>
             </div>
 
-            {/* Phone and tablet: one card per client, same facts, stacked. */}
+            {/* Phone and tablet: one card per client, same facts, stacked. The
+                checkbox sits outside the link, which may not hold a control. */}
             <ul className="flex flex-col lg:hidden">
                 {rows.map((client) => (
-                    <li key={client.id}>
+                    <li
+                        key={client.id}
+                        className={cn(
+                            'flex items-center border-b border-border',
+                            selected.has(client.id) && 'bg-primary-soft/50',
+                        )}
+                    >
+                        <PickBox
+                            client={client}
+                            checked={selected.has(client.id)}
+                            onToggle={onToggle}
+                            className="self-stretch pr-3"
+                        />
                         <Link
                             href={leadShow(client.id)}
                             prefetch
-                            className="-mx-2 flex items-center gap-3 rounded-md border-b border-border px-2 py-3.5 transition-colors hover:bg-neutral-soft"
+                            className="-mr-2 flex min-w-0 flex-1 items-center gap-3 rounded-md px-2 py-3.5 transition-colors hover:bg-neutral-soft"
                         >
                             <span className="min-w-0 flex-1">
                                 <span className="flex items-baseline gap-2">
@@ -202,7 +265,11 @@ export function ClientsTable({ rows, sort, onSort }: Props) {
                                         </span>
                                     </span>
                                     <span aria-hidden>·</span>
-                                    <ContactMark client={client} withLabel />
+                                    <ContractMark
+                                        client={client}
+                                        endingSoonDays={endingSoonDays}
+                                        inline
+                                    />
                                     <span aria-hidden>·</span>
                                     <span>
                                         {client.owner ?? 'Belum ada PJ'}
@@ -223,35 +290,117 @@ export function ClientsTable({ rows, sort, onSort }: Props) {
 }
 
 /**
- * When the client was last spoken to. Red only once that is older than the
- * stage tolerates: a breach, not a decoration.
+ * The row's checkbox, inside a label so the whole cell takes the click
+ * instead of opening the record. A client that cannot be deleted keeps the
+ * box, switched off, with the reason on hover and for a screen reader.
  */
-function ContactMark({
+function PickBox({
     client,
-    withLabel = false,
+    checked,
+    onToggle,
+    className,
 }: {
     client: Client;
-    withLabel?: boolean;
+    checked: boolean;
+    onToggle: (id: number) => void;
+    className?: string;
 }) {
-    const when = relativeDays(client.daysSinceContact);
-    const text = withLabel ? `Kontak ${when}` : when;
+    const locked = client.locked !== null;
 
-    if (client.needsContact) {
-        return (
+    return (
+        <label
+            className={cn(
+                'flex items-center',
+                locked ? 'cursor-not-allowed' : 'cursor-pointer',
+                className,
+            )}
+            title={client.locked ?? undefined}
+        >
+            <Checkbox
+                checked={!locked && checked}
+                onCheckedChange={() => onToggle(client.id)}
+                disabled={locked}
+                aria-label={
+                    locked
+                        ? `${client.company} tidak bisa dihapus: ${client.locked}`
+                        : `Pilih ${client.company}`
+                }
+            />
+        </label>
+    );
+}
+
+/**
+ * How long the contract has left. Red only once it has run out while the
+ * client is still on the books: a breach, not a decoration. No term at all is
+ * a client engaged on the spot.
+ */
+function ContractMark({
+    client,
+    endingSoonDays,
+    inline = false,
+}: {
+    client: Client;
+    endingSoonDays: number;
+    inline?: boolean;
+}) {
+    const { contract } = client;
+
+    if (contract === null) {
+        return <span className="text-muted-foreground">On spot</span>;
+    }
+
+    const end = entryDate(contract.end);
+    const length = contractLength(contract.months);
+
+    if (contract.daysLeft < 0) {
+        const ended = (
             <span className="inline-flex items-center gap-1.5 font-bold whitespace-nowrap text-destructive">
                 <span
                     className="size-1.5 shrink-0 rounded-full bg-destructive"
                     aria-hidden
                 />
-                {text}
-                <span className="sr-only">
-                    , lebih lama dari batas {client.threshold} hari
+                <span>
+                    Habis <span data-numeric>{end}</span>
                 </span>
+            </span>
+        );
+
+        if (inline) {
+            return ended;
+        }
+
+        return (
+            <span className="inline-flex flex-col items-end">
+                {ended}
+                <span className="text-xs text-muted-foreground">{length}</span>
+            </span>
+        );
+    }
+
+    const soon = contract.daysLeft <= endingSoonDays;
+    const lead = soon ? (
+        <span className="font-bold text-foreground" data-numeric>
+            Sisa {contract.daysLeft} hari
+        </span>
+    ) : (
+        <span>{length}</span>
+    );
+
+    if (inline) {
+        return (
+            <span className="whitespace-nowrap">
+                {lead} · s/d <span data-numeric>{end}</span>
             </span>
         );
     }
 
     return (
-        <span className="whitespace-nowrap text-muted-foreground">{text}</span>
+        <span className="inline-flex flex-col items-end whitespace-nowrap">
+            {lead}
+            <span className="text-xs text-muted-foreground">
+                s/d <span data-numeric>{end}</span>
+            </span>
+        </span>
     );
 }
