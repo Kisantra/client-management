@@ -36,6 +36,7 @@ import {
 } from '@/components/ui/dropdown-menu';
 import { CHANNEL_LABELS } from '@/data/dashboard';
 import {
+    contractLength,
     entryDate,
     longDate,
     relativeDays,
@@ -418,9 +419,37 @@ export default function LeadDetailPage({
                                           ? `${longDate(nextFollowUp.at)} · ${nextFollowUp.via}`
                                           : 'Belum dijadwalkan'}
                                 </Row>
-                                <Row label="Kontak terakhir">
-                                    {relativeDays(lead.daysSinceContact)}
-                                </Row>
+                                {/* A running client is under contract, so
+                                    nobody chases it for a last contact. */}
+                                {lead.stage === 'client' ? null : (
+                                    <Row label="Kontak terakhir">
+                                        {relativeDays(lead.daysSinceContact)}
+                                    </Row>
+                                )}
+                                {SIGNED_STAGES.includes(lead.stage) ? (
+                                    <Row label="Kontrak">
+                                        {lead.contract ? (
+                                            <span
+                                                className={cn(
+                                                    lead.contract.daysLeft <
+                                                        0 &&
+                                                        'font-bold text-destructive',
+                                                )}
+                                            >
+                                                {contractLength(
+                                                    lead.contract.months,
+                                                )}
+                                                ,{' '}
+                                                {lead.contract.daysLeft < 0
+                                                    ? 'habis'
+                                                    : 's/d'}{' '}
+                                                {entryDate(lead.contract.end)}
+                                            </span>
+                                        ) : (
+                                            'On spot'
+                                        )}
+                                    </Row>
+                                ) : null}
                                 <Row label="Masuk">
                                     {entryDate(lead.entryAt)}
                                 </Row>

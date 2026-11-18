@@ -83,6 +83,8 @@ trait RecordsActivity
             'source' => 'Asal',
             'service' => 'Layanan',
             'value' => 'Estimasi nilai',
+            'contract_months' => 'Durasi kontrak',
+            'contract_start' => 'Mulai kontrak',
             'stage' => 'Tahap',
             'status' => 'Status',
             'owner' => 'Penanggung jawab',

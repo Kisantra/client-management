@@ -1,5 +1,5 @@
 import type { ChannelKey } from '@/data/dashboard';
-import type { Lead } from '@/data/leads';
+import type { Contract, Lead } from '@/data/leads';
 
 /**
  * A client is a lead that has been signed: either already running, or dealt
@@ -16,8 +16,10 @@ export type Client = Lead & {
     since: string;
     /** Days from the first enquiry to becoming a client; null for a deal. */
     daysToConvert: number | null;
-    /** True once nobody has spoken to it for longer than its own stage allows. */
-    needsContact: boolean;
+    /** Null for a client engaged on the spot. */
+    contract: Contract | null;
+    /** Why it cannot be picked for deletion; null when it can. */
+    locked: string | null;
 };
 
 export type ClientSummary = {
@@ -36,7 +38,12 @@ export type ClientSummary = {
     lastMonth: string;
     medianDays: number | null;
     fastestDays: number | null;
-    needsContact: number;
+    /** Clients on a term, and the rest, engaged on the spot. */
+    contracted: number;
+    onSpot: number;
+    /** Terms ending within the page's warning window, and those already past. */
+    endingSoon: number;
+    expired: number;
 };
 
 /** One bar in a rail: how many clients a channel or a person accounts for. */

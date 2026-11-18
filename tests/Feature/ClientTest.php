@@ -1,8 +1,13 @@
 <?php
 
+use App\Models\Handoff;
 use App\Models\Lead;
+use App\Models\LeadNote;
+use App\Models\Letter;
+use App\Models\LetterTemplate;
 use App\Models\User;
 use Illuminate\Support\Carbon;
+use Illuminate\Support\Facades\Storage;
 
 beforeEach(function () {
     // Mid-month, so "this month" and "last month" fall where the test expects.
@@ -11,6 +16,12 @@ beforeEach(function () {
 });
 
 afterEach(fn () => Carbon::setTestNow());
+
+/** Headers for a visit Inertia makes itself, so the response carries the flash. */
+function inertiaVisit(): array
+{
+    return ['X-Inertia' => 'true', 'X-Inertia-Version' => Inertia\Inertia::getVersion()];
+}
 
 /** A client that came in 200 days ago, signed 10 days ago, spoken to 3 days ago. */
 function client(array $attributes = []): Lead
@@ -57,14 +68,12 @@ it('lists only active clients, with the figures that measure them', function () 
             // Conversions of 190 and 20 days: the median sits between them.
             ->where('summary.medianDays', 105)
             ->where('summary.fastestDays', 20)
-            ->where('summary.needsContact', 0)
             ->has('rows.data', 2)
             // Newest client first.
             ->where('rows.data.0.company', 'PT Graha Artha')
             ->where('rows.data.0.since', Carbon::today()->subDays(10)->toDateString())
             ->where('rows.data.0.daysToConvert', 190)
             ->where('rows.data.0.owner', 'Bayu')
-            ->where('rows.data.0.needsContact', false)
         );
 });
 
@@ -111,45 +120,143 @@ it('counts a signed deal as a client, but never as an active one', function () {
         );
 });
 
-it('measures each row against the contact tolerance of its own stage', function () {
-    /* Twenty days of silence: nothing at all for a running client, three
-       weeks overdue for a deal nobody has started. One shared threshold would
-       have let the deal sit unanswered and still look healthy. */
-    client(['company' => 'Client Diam', 'last_contact_at' => Carbon::today()->subDays(20)]);
-    client([
-        'company' => 'Deal Diam',
-        'stage' => 'deal',
-        'last_contact_at' => Carbon::today()->subDays(20),
-        'stage_changed_at' => Carbon::today()->subDays(4),
-    ]);
+it('reads each contract to its end, and leaves on-spot clients without one', function () {
+    client(['company' => 'Tahunan', 'contract_months' => 12, 'contract_start' => '2026-01-01']);
+    client(['company' => 'Hampir Habis', 'contract_months' => 3, 'contract_start' => '2026-06-01']);
+    client(['company' => 'Sudah Habis', 'contract_months' => 6, 'contract_start' => '2026-01-15']);
+    client(['company' => 'Sekali Jalan']);
 
-    $this->get(route('clients'))
+    expect(Lead::firstWhere('company', 'Tahunan')->contract_ends_at->toDateString())->toBe('2026-12-31');
+
+    $this->get(route('clients', ['urut' => 'kontrak']))
         ->assertInertia(fn ($page) => $page
-            ->where('summary.needsContact', 1)
-            ->where('contactThreshold.deal', 5)
-            ->where('contactThreshold.client', 30)
-            ->where('stageLabels.deal', 'Deal')
-            ->where('stageLabels.client', 'Client aktif')
-            ->where('rows.data.0.company', 'PT Deal Diam')
-            ->where('rows.data.0.needsContact', true)
-            ->where('rows.data.1.company', 'PT Client Diam')
-            ->where('rows.data.1.needsContact', false)
+            ->where('endingSoonDays', 30)
+            ->where('summary.contracted', 3)
+            ->where('summary.onSpot', 1)
+            // Ends 31 August, eleven days out.
+            ->where('summary.endingSoon', 1)
+            ->where('summary.expired', 1)
+            ->missing('summary.needsContact')
+            // Soonest to run out first, the on-spot client last.
+            ->where('rows.data.0.company', 'PT Sudah Habis')
+            ->where('rows.data.0.contract.end', '2026-07-14')
+            ->where('rows.data.0.contract.daysLeft', -37)
+            ->where('rows.data.1.company', 'PT Hampir Habis')
+            ->where('rows.data.1.contract.daysLeft', 11)
+            ->where('rows.data.2.company', 'PT Tahunan')
+            ->where('rows.data.2.contract.months', 12)
+            ->where('rows.data.3.company', 'PT Sekali Jalan')
+            ->where('rows.data.3.contract', null)
+            ->missing('rows.data.0.needsContact')
         );
 });
 
-it('flags a client left unspoken-to past the stage tolerance, and puts them first', function () {
-    client();
-    client(['company' => 'Mekar Raya', 'last_contact_at' => Carbon::today()->subDays(31)]);
-    client(['company' => 'Tepat Batas', 'last_contact_at' => Carbon::today()->subDays(30)]);
+it('saves a contract term from the lead form, and drops it for an on-spot client', function () {
+    $fields = [
+        'entity' => 'PT',
+        'company' => 'Karya Makmur',
+        'pic' => 'Budi Santoso',
+        'channel' => 'whatsapp',
+        'source' => 'Chat langsung',
+        'service' => 'Konsultasi Umum',
+        'stage' => 'client',
+        'entered_at' => '2026-08-01',
+    ];
 
-    $this->get(route('clients', ['urut' => 'kontak']))
+    $this->post(route('leads.store'), [...$fields, 'contract_months' => 12])
+        ->assertSessionHasErrors('contract_start');
+
+    $this->post(route('leads.store'), [...$fields, 'contract_months' => 12, 'contract_start' => '2026-08-01'])
+        ->assertRedirect();
+
+    $lead = Lead::firstWhere('company', 'Karya Makmur');
+
+    expect($lead->contract_months)->toBe(12)
+        ->and($lead->contract_ends_at->toDateString())->toBe('2027-07-31');
+
+    // On spot: a start date left behind without a term is not kept.
+    $this->post(route('leads.update', $lead), [...$fields, 'contract_months' => '', 'contract_start' => '2026-08-01'])
+        ->assertRedirect();
+
+    expect($lead->fresh())
+        ->contract_months->toBeNull()
+        ->contract_start->toBeNull()
+        ->contract_ends_at->toBeNull();
+});
+
+it('deletes the picked clients with their files, and nothing else', function () {
+    Storage::fake('local');
+
+    $one = client();
+    $two = client(['company' => 'Mekar Raya']);
+    $kept = client(['company' => 'Tidak Dipilih']);
+    $lead = client(['company' => 'Masih Proposal', 'stage' => 'proposal']);
+
+    Storage::disk('local')->put('leads/'.$one->id.'/kontrak.pdf', 'pdf');
+    $one->notes()->create(['author' => 'Admin', 'body' => 'Kontrak sudah diteken.']);
+
+    $this->delete(route('clients.destroy'), ['ids' => [$one->id, $two->id, $lead->id]])
+        ->assertRedirect();
+
+    $this->withHeaders(inertiaVisit())
+        ->get(route('clients'))
+        ->assertJsonPath('flash.toast.message', '2 client dihapus');
+
+    expect(Lead::pluck('company')->sort()->values()->all())->toBe(['Masih Proposal', 'Tidak Dipilih'])
+        ->and(LeadNote::count())->toBe(0);
+
+    Storage::disk('local')->assertMissing('leads/'.$one->id.'/kontrak.pdf');
+});
+
+it('passes over a client whose letter is numbered or that Project Management holds', function () {
+    LetterTemplate::seedDefaults();
+
+    $numbered = client(['company' => 'Bersurat']);
+    $handedOver = client(['company' => 'Diserahkan']);
+    $withdrawn = client(['company' => 'Sudah Batal']);
+    $free = client(['company' => 'Bebas']);
+
+    $template = LetterTemplate::firstWhere('code', 'penawaran-jasa');
+    Letter::create([
+        'letter_template_id' => $template->id,
+        'lead_id' => $numbered->id,
+        'letter_date' => Carbon::today(),
+        'subject' => $template->subject,
+        'recipient' => $template->recipient,
+        'values' => $template->defaultValues(),
+        'signers' => [],
+        'status' => Letter::ISSUED,
+        'number' => 'PEN-001/KSN-BE/VIII/2026',
+    ]);
+
+    Handoff::create(['lead_id' => $handedOver->id, 'status' => Handoff::SENT, 'sent_at' => now()]);
+    Handoff::create(['lead_id' => $withdrawn->id, 'status' => Handoff::WITHDRAWN, 'sent_at' => now(), 'withdrawn_at' => now()]);
+
+    $this->get(route('clients', ['urut' => 'nama']))
         ->assertInertia(fn ($page) => $page
-            ->where('summary.needsContact', 1)
-            ->where('rows.data.0.company', 'PT Mekar Raya')
-            ->where('rows.data.0.needsContact', true)
-            ->where('rows.data.1.company', 'PT Tepat Batas')
-            ->where('rows.data.1.needsContact', false)
+            ->where('rows.data.0.company', 'PT Bebas')
+            ->where('rows.data.0.locked', null)
+            ->where('rows.data.1.company', 'PT Bersurat')
+            ->where('rows.data.1.locked', 'Punya surat bernomor, yang harus tetap tercatat.')
+            ->where('rows.data.2.company', 'PT Diserahkan')
+            ->where('rows.data.2.locked', 'Sudah diserahkan ke Project Management.')
+            ->where('rows.data.3.company', 'PT Sudah Batal')
+            ->where('rows.data.3.locked', null)
         );
+
+    $this->delete(route('clients.destroy'), ['ids' => Lead::pluck('id')->all()]);
+
+    $this->withHeaders(inertiaVisit())
+        ->get(route('clients'))
+        ->assertJsonPath('flash.toast.type', 'warning')
+        ->assertJsonPath('flash.toast.message', '2 client dihapus')
+        ->assertJsonPath(
+            'flash.toast.description',
+            '2 dilewati. PT Bersurat: Punya surat bernomor, yang harus tetap tercatat. PT Diserahkan: Sudah diserahkan ke Project Management.',
+        );
+
+    expect(Lead::pluck('company')->sort()->values()->all())->toBe(['Bersurat', 'Diserahkan'])
+        ->and(Letter::count())->toBe(1);
 });
 
 it('filters by channel, person, service and search, and keeps the rails counting', function () {

@@ -48,6 +48,28 @@ it('lists leads with stage counts and totals', function () {
         );
 });
 
+it('leaves running clients to the Clients page', function () {
+    lead();
+    lead(['company' => 'Bumi Artha', 'stage' => 'client']);
+
+    $this->get(route('leads'))
+        ->assertInertia(fn ($page) => $page
+            ->where('totals.count', 1)
+            ->has('rows.data', 1)
+            ->has('stages', 5)
+            ->where('stages.4.key', 'deal')
+        );
+
+    $this->get(route('leads', ['tahap' => 'client']))
+        ->assertInertia(fn ($page) => $page
+            ->where('filters.tahap', 'semua')
+            ->has('rows.data', 1)
+        );
+
+    $this->get(route('leads', ['view' => 'papan']))
+        ->assertInertia(fn ($page) => $page->has('columns', 5));
+});
+
 it('marks a lead stalled once it passes its stage tolerance', function () {
     // Deal tolerates five days; this one has sat for eight.
     lead(['stage' => 'deal', 'stage_changed_at' => Carbon::today()->subDays(8)]);
@@ -93,7 +115,7 @@ it('serves the board as columns with database totals', function () {
     $this->get(route('leads', ['view' => 'papan', 'tahap' => 'lead']))
         ->assertInertia(fn ($page) => $page
             ->where('rows', null)
-            ->has('columns', 6)
+            ->has('columns', 5)
             // The stage filter is ignored on the board: every column shows.
             ->where('columns.4.key', 'deal')
             ->where('columns.4.count', 1)

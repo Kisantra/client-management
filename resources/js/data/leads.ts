@@ -75,10 +75,28 @@ export type LeadDetail = Lead & {
     closedNote: string | null;
     /** The piece on the calendar it came from, when the source is one. */
     contentId: number | null;
+    contract: Contract | null;
 };
 
 /** The stages where the client has signed and Project Management takes over. */
 export const SIGNED_STAGES = ['deal', 'client'];
+
+/** A signed client's term. Absent for a client engaged on the spot. */
+export type Contract = {
+    months: number;
+    /** First and last day of the term, as sent: YYYY-MM-DD. */
+    start: string;
+    end: string;
+    /** Days until the last day; negative once it has passed. */
+    daysLeft: number;
+};
+
+/** "12 bulan", or "2 tahun" when the months make whole years. */
+export function contractLength(months: number): string {
+    return months >= 12 && months % 12 === 0
+        ? `${months / 12} tahun`
+        : `${months} bulan`;
+}
 
 /** Where a signed client stands in Project Management. */
 export type Handoff = {

@@ -34,7 +34,10 @@ class Lead extends Model
             'last_contact_at' => 'date',
             'stalled_at' => 'date',
             'closed_at' => 'date',
+            'contract_start' => 'date',
+            'contract_ends_at' => 'date',
             'value' => 'integer',
+            'contract_months' => 'integer',
             'office_lat' => 'float',
             'office_lng' => 'float',
         ];
@@ -54,6 +57,11 @@ class Lead extends Model
                 : Carbon::parse($lead->stage_changed_at);
 
             $lead->stalled_at = $changed->copy()->addDays(Pipeline::threshold($lead->stage));
+
+            // A twelve-month contract from 1 January runs through 31 December.
+            $lead->contract_ends_at = $lead->contract_months && $lead->contract_start
+                ? Carbon::parse($lead->contract_start)->addMonthsNoOverflow($lead->contract_months)->subDay()
+                : null;
         });
 
         /*
@@ -169,6 +177,57 @@ class Lead extends Model
         return ! $this->isClosed() && in_array($this->stage, self::SIGNED, true);
     }
 
+    /**
+     * The contract term, or null for a client engaged on the spot.
+     *
+     * @return array{months: int, start: string, end: string, daysLeft: int}|null
+     */
+    public function contract(): ?array
+    {
+        if ($this->contract_ends_at === null) {
+            return null;
+        }
+
+        return [
+            'months' => $this->contract_months,
+            'start' => $this->contract_start->toDateString(),
+            'end' => $this->contract_ends_at->toDateString(),
+            // Negative once the term has run out.
+            'daysLeft' => (int) Carbon::today()->diffInDays($this->contract_ends_at, false),
+        ];
+    }
+
+    /**
+     * Why this lead may not be deleted, or null when it may.
+     *
+     * A numbered letter is on the register for good, and deleting the lead
+     * would take the letter with it. A client Project Management is holding
+     * would be left there with nobody on this side to call it off. Reads the
+     * `letters_numbered_exists` and `handoff` the caller loaded.
+     */
+    public function deletionBlocker(): ?string
+    {
+        if ($this->letters_numbered_exists) {
+            return 'Punya surat bernomor, yang harus tetap tercatat.';
+        }
+
+        $handoff = $this->handoff;
+
+        if ($handoff !== null && $handoff->status !== Handoff::WITHDRAWN && $handoff->sent_at !== null) {
+            return 'Sudah diserahkan ke Project Management.';
+        }
+
+        return null;
+    }
+
+    /** @param  Builder<Lead>  $query */
+    public function scopeWithDeletionFacts(Builder $query): Builder
+    {
+        return $query
+            ->with('handoff')
+            ->withExists(['letters as letters_numbered_exists' => fn (Builder $letters) => $letters->whereNotNull('number')]);
+    }
+
     /** Only a lead someone is still meant to be working can be stalled. */
     public function isStalled(): bool
     {
@@ -237,6 +296,6 @@ class Lead extends Model
     /** Dates the pipeline keeps in step by itself; nobody typed these. */
     public function activityIgnores(): array
     {
-        return ['stage_changed_at', 'stalled_at'];
+        return ['stage_changed_at', 'stalled_at', 'contract_ends_at'];
     }
 }

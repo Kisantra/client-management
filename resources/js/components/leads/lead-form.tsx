@@ -28,7 +28,13 @@ import {
 import { Textarea } from '@/components/ui/textarea';
 import { CHANNEL_LABELS } from '@/data/dashboard';
 import type { ChannelKey } from '@/data/dashboard';
-import { asDate, shortRupiah, TODAY } from '@/data/leads';
+import {
+    asDate,
+    contractLength,
+    shortRupiah,
+    SIGNED_STAGES,
+    TODAY,
+} from '@/data/leads';
 import { usePipeline, useStageLabels } from '@/hooks/use-pipeline';
 import { cn } from '@/lib/utils';
 import { clients, leads } from '@/routes';
@@ -101,10 +107,16 @@ export type EditableLead = {
     contentId: number | null;
     service: string;
     value: number;
+    /** Null for a client engaged on the spot. */
+    contractMonths: number | null;
+    contractStart: string | null;
     stage: string;
     owner: string | null;
     enteredAt: string;
 };
+
+/** Quick picks for the term; anything else is typed. */
+const CONTRACT_PRESETS = [3, 6, 12, 24];
 
 type Errors = Partial<Record<string, string>>;
 
@@ -182,10 +194,26 @@ export function LeadForm({
     const [thenOffer, setThenOffer] = useState(false);
     const [owner, setOwner] = useState(lead?.owner ?? '');
 
+    const [contractMonths, setContractMonths] = useState(
+        lead?.contractMonths ? String(lead.contractMonths) : '',
+    );
+    /* Undefined until picked: a new client's term then starts the day it
+       became one, and an existing lead's starts today. */
+    const [contractStart, setContractStart] = useState<Date | undefined>(
+        lead?.contractStart ? asDate(lead.contractStart) : undefined,
+    );
+    const [contractOpen, setContractOpen] = useState(false);
+
     const [errors, setErrors] = useState<Errors>({});
     const [saving, setSaving] = useState(false);
 
     const numericValue = Number(value.replace(/\D/g, ''));
+
+    /* Only a signed client has a contract; before that the section stays
+       hidden, and nothing it held is sent. */
+    const signed = SIGNED_STAGES.includes(stage);
+    const months = signed ? Number(contractMonths) : 0;
+    const startDate = contractStart ?? (lead ? TODAY : (entryAt ?? TODAY));
     const resolvedService =
         service === CUSTOM_SERVICE ? customService.trim() : service;
     const fullName = company ? `${entity} ${company}`.trim() : '';
@@ -321,6 +349,8 @@ export function LeadForm({
             entered_at: toIso(entryAt ?? TODAY),
             service: resolvedService,
             value: numericValue,
+            contract_months: months > 0 ? months : '',
+            contract_start: months > 0 ? toIso(startDate) : '',
             note: note.trim(),
             stage,
             owner: owner.trim(),
@@ -998,6 +1028,135 @@ export function LeadForm({
                                 </label>
                             ) : null}
                         </FormSection>
+
+                        {signed ? (
+                            <FormSection
+                                title="Kontrak"
+                                description="Berapa lama kerja samanya berjalan. Client on spot, yang dikerjakan sekali, tidak punya durasi."
+                            >
+                                <Field
+                                    id="contract-months"
+                                    label="Durasi kontrak"
+                                    optional
+                                    error={errors.contract_months}
+                                    hint={
+                                        months > 0
+                                            ? `${contractLength(months)}, berakhir ${dateLabel.format(contractEnd(startDate, months))}.`
+                                            : 'Kosongkan untuk client on spot.'
+                                    }
+                                >
+                                    <div className="relative">
+                                        <Input
+                                            id="contract-months"
+                                            inputMode="numeric"
+                                            value={contractMonths}
+                                            onChange={(event) =>
+                                                setContractMonths(
+                                                    event.target.value
+                                                        .replace(/\D/g, '')
+                                                        .slice(0, 3),
+                                                )
+                                            }
+                                            placeholder="On spot"
+                                            className="pr-16"
+                                            aria-invalid={Boolean(
+                                                errors.contract_months,
+                                            )}
+                                            aria-describedby={
+                                                errors.contract_months
+                                                    ? 'contract-months-error'
+                                                    : 'contract-months-hint'
+                                            }
+                                        />
+                                        <span className="pointer-events-none absolute inset-y-0 right-3 flex items-center text-sm font-semibold text-muted-foreground">
+                                            bulan
+                                        </span>
+                                    </div>
+                                    <div className="flex flex-wrap gap-1.5">
+                                        {[0, ...CONTRACT_PRESETS].map(
+                                            (preset) => {
+                                                const active =
+                                                    preset === months;
+
+                                                return (
+                                                    <button
+                                                        key={preset}
+                                                        type="button"
+                                                        aria-pressed={active}
+                                                        onClick={() =>
+                                                            setContractMonths(
+                                                                preset === 0
+                                                                    ? ''
+                                                                    : String(
+                                                                          preset,
+                                                                      ),
+                                                            )
+                                                        }
+                                                        className={cn(
+                                                            'rounded-full px-2.5 py-1 text-xs font-bold transition-colors',
+                                                            active
+                                                                ? 'bg-primary-soft text-primary-deep'
+                                                                : 'bg-neutral-soft text-secondary-foreground hover:bg-accent',
+                                                        )}
+                                                    >
+                                                        {preset === 0
+                                                            ? 'On spot'
+                                                            : contractLength(
+                                                                  preset,
+                                                              )}
+                                                    </button>
+                                                );
+                                            },
+                                        )}
+                                    </div>
+                                </Field>
+
+                                {months > 0 ? (
+                                    <Field
+                                        id="contract-start"
+                                        label="Mulai kontrak"
+                                        error={errors.contract_start}
+                                    >
+                                        <Popover
+                                            open={contractOpen}
+                                            onOpenChange={setContractOpen}
+                                        >
+                                            <PopoverTrigger asChild>
+                                                <button
+                                                    type="button"
+                                                    id="contract-start"
+                                                    className="flex h-9 w-full items-center gap-2 rounded-md border border-input bg-transparent px-3 text-left text-sm shadow-xs transition-[color,box-shadow] outline-none focus-visible:border-ring focus-visible:ring-[3px] focus-visible:ring-ring/50"
+                                                >
+                                                    <CalendarDays
+                                                        className="size-4 shrink-0 text-muted-foreground"
+                                                        strokeWidth={1.75}
+                                                        aria-hidden
+                                                    />
+                                                    {dateLabel.format(
+                                                        startDate,
+                                                    )}
+                                                </button>
+                                            </PopoverTrigger>
+                                            <PopoverContent
+                                                align="start"
+                                                className="w-auto p-3"
+                                            >
+                                                <Calendar
+                                                    mode="single"
+                                                    selected={startDate}
+                                                    onSelect={(date) => {
+                                                        setContractStart(date);
+                                                        setContractOpen(false);
+                                                    }}
+                                                    defaultMonth={startDate}
+                                                    autoFocus
+                                                />
+                                            </PopoverContent>
+                                        </Popover>
+                                    </Field>
+                                ) : null}
+                            </FormSection>
+                        ) : null}
                     </div>
 
                     {/* Consequence, not decoration: the card the form is building. */}
@@ -1083,6 +1242,18 @@ export function LeadForm({
                                         {resolvedService || '—'}
                                     </dd>
                                 </div>
+                                {signed ? (
+                                    <div className="flex items-baseline justify-between gap-3">
+                                        <dt className="text-muted-foreground">
+                                            Kontrak
+                                        </dt>
+                                        <dd className="truncate font-bold">
+                                            {months > 0
+                                                ? contractLength(months)
+                                                : 'On spot'}
+                                        </dd>
+                                    </div>
+                                ) : null}
                                 <div className="flex items-baseline justify-between gap-3">
                                     <dt className="text-muted-foreground">
                                         Penanggung jawab
@@ -1145,6 +1316,18 @@ export function LeadForm({
             </form>
         </>
     );
+}
+
+/**
+ * The term's last day, as the server works it out: the same date so many
+ * months on, held to the end of a shorter month, less one day.
+ */
+function contractEnd(start: Date, months: number): Date {
+    const year = start.getFullYear();
+    const month = start.getMonth() + months;
+    const lastDay = new Date(year, month + 1, 0).getDate();
+
+    return new Date(year, month, Math.min(start.getDate(), lastDay) - 1);
 }
 
 /** Dates travel as plain calendar days; the server never sees a timezone. */

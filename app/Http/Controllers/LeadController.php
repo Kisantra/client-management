@@ -25,6 +25,9 @@ class LeadController extends Controller
     /** Cards loaded per board column before the column asks for more. */
     private const PER_COLUMN = 20;
 
+    /** A running client is read on the Clients page, not in the pipeline here. */
+    private const GRADUATED = 'client';
+
     public function index(Request $request): Response
     {
         $filters = $this->filters($request);
@@ -58,7 +61,7 @@ class LeadController extends Controller
             ->groupBy('stage')
             ->pluck('total', 'stage');
 
-        $stages = collect(Pipeline::forClient())
+        $stages = collect($this->stages())
             ->map(fn (array $stage) => [...$stage, 'count' => (int) ($counts[$stage['key']] ?? 0)])
             ->all();
 
@@ -187,6 +190,7 @@ class LeadController extends Controller
                     : ['lat' => $lead->office_lat, 'lng' => $lead->office_lng],
                 'closedNote' => $lead->closed_note,
                 'contentId' => $lead->content_id,
+                'contract' => $lead->contract(),
             ],
             'timeline' => $this->timeline($lead),
             /* Where the client stands in Project Management, once it went
@@ -240,6 +244,8 @@ class LeadController extends Controller
                 'contentId' => $lead->content_id,
                 'service' => $lead->service,
                 'value' => $lead->value,
+                'contractMonths' => $lead->contract_months,
+                'contractStart' => $lead->contract_start?->toDateString(),
                 'stage' => $lead->stage,
                 'owner' => $lead->owner,
                 'enteredAt' => $lead->entered_at->toDateString(),
@@ -311,10 +317,19 @@ class LeadController extends Controller
             ->all();
     }
 
+    /** The pipeline as this page shows it: every stage before a running client. */
+    private function stages(): array
+    {
+        return array_values(array_filter(
+            Pipeline::forClient(),
+            fn (array $stage) => $stage['key'] !== self::GRADUATED,
+        ));
+    }
+
     /** The filters the list is read through, normalised and safe to trust. */
     private function filters(Request $request): array
     {
-        $stages = Pipeline::keys();
+        $stages = array_column($this->stages(), 'key');
         $channels = array_keys(Pipeline::channels());
         $sorts = ['lama', 'nilai', 'kontak', 'nama', 'masuk'];
 
@@ -354,6 +369,7 @@ class LeadController extends Controller
     private function matching(array $filters)
     {
         return Lead::query()
+            ->where('stage', '!=', self::GRADUATED)
             ->when($filters['status'] === 'mandek', fn ($query) => $query->stalled())
             ->when($filters['channel'] !== 'semua', fn ($query) => $query->where('channel', $filters['channel']))
             ->when($filters['dari'], fn ($query, $from) => $query->whereDate('entered_at', '>=', $from))
@@ -418,7 +434,7 @@ class LeadController extends Controller
             ->get()
             ->keyBy('stage');
 
-        return collect(Pipeline::forClient())
+        return collect($this->stages())
             ->map(function (array $stage) use ($matching, $filters, $stats) {
                 $limit = $filters['kolom'] === $stage['key'] ? $filters['per'] : self::PER_COLUMN;
 
