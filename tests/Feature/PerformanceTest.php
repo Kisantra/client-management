@@ -351,7 +351,8 @@ it('reads both Performa pages over the window they were asked for', function () 
         'dari' => '2026-06-01',
         'sampai' => '2026-06-30',
     ]))->assertInertia(fn ($page) => $page
-        ->where('period.label', '1 – 30 Jun 2026')
+        // A whole calendar month is named as that month.
+        ->where('period.label', 'Juni 2026')
         ->has('rows', 1)
     );
 

@@ -6,11 +6,14 @@ import { ClientsTable } from '@/components/clients/clients-table';
 import type { ClientSort } from '@/components/clients/clients-table';
 import { ContentList } from '@/components/clients/content-list';
 import { ShareList } from '@/components/clients/share-list';
-import { CountChip } from '@/components/count-chip';
 import { Panel } from '@/components/dashboard/panel';
 import { FilterSelect } from '@/components/filter-select';
+import { ChannelIcon } from '@/components/leads/channel-icon';
 import { ConfirmDialog } from '@/components/letters/confirm-dialog';
 import { ListPager } from '@/components/list-pager';
+import { MultiFilterSelect } from '@/components/multi-filter-select';
+import { PeriodFilter } from '@/components/period-filter';
+import type { Period } from '@/components/period-filter';
 import { Button } from '@/components/ui/button';
 import type {
     Client,
@@ -18,6 +21,7 @@ import type {
     ContentShare,
     Share,
 } from '@/data/clients';
+import type { ChannelKey } from '@/data/dashboard';
 import { rupiah } from '@/data/leads';
 import { clients } from '@/routes';
 import { destroy as clientsDestroy } from '@/routes/clients';
@@ -30,17 +34,36 @@ const SORTS: { key: ClientSort; label: string }[] = [
     { key: 'nama', label: 'Nama A–Z' },
 ];
 
+/** Read against the day each became a client; the server holds the same list. */
+const PERIODS = [
+    'minggu-ini',
+    'minggu-lalu',
+    'bulan-ini',
+    'bulan-lalu',
+    'kuartal',
+    'tahun',
+    '30hari',
+    '90hari',
+    'semua',
+];
+
 type Filters = {
     q: string;
     layanan: string;
-    channel: string;
+    /** The channels picked; empty means every channel. */
+    channel: string[];
     /** A person's name, 'tanpa' for the unassigned, or 'semua'. */
     pj: string;
     urut: ClientSort;
+    periode: string;
+    /** Set only for a custom range: YYYY-MM-DD. */
+    dari: string;
+    sampai: string;
 };
 
 type Props = {
     filters: Filters;
+    period: Period;
     /** Active clients before any filter: decides which empty state shows. */
     total: number;
     /** Days before its end that a contract counts as running out. */
@@ -63,9 +86,9 @@ type Props = {
 /** Only the parameters that differ from the default ride in the URL. */
 const DEFAULTS: Record<string, string> = {
     layanan: 'semua',
-    channel: 'semua',
     pj: 'semua',
     urut: 'sejak',
+    periode: 'semua',
 };
 
 /** The form opens on the last stage: a client that predates the tool. */
@@ -73,6 +96,7 @@ const addClient = leadsCreate({ query: { tahap: 'client' } });
 
 export default function Clients({
     filters,
+    period,
     total,
     endingSoonDays,
     summary,
@@ -85,6 +109,9 @@ export default function Clients({
     /** The one control that types faster than the server can answer. */
     const [query, setQuery] = useState(filters.q);
     const typing = useRef<ReturnType<typeof setTimeout> | null>(null);
+    /* Ticked ahead of the server too: a second box ticked before the first
+       answer lands must add to the pick, not replace it. */
+    const [channelPick, setChannelPick] = useState(filters.channel);
 
     /*
      | Picked for deletion, on this page only: a filter or page change starts
@@ -135,9 +162,13 @@ export default function Clients({
         const next: Record<string, string> = {
             q: query,
             layanan: filters.layanan,
-            channel: filters.channel,
+            // One comma-joined parameter rather than `channel[0]=…&channel[1]=…`.
+            channel: channelPick.join(','),
             pj: filters.pj,
             urut: filters.urut,
+            periode: filters.periode,
+            dari: filters.dari,
+            sampai: filters.sampai,
         };
 
         for (const [key, value] of Object.entries(patch)) {
@@ -175,16 +206,16 @@ export default function Clients({
     const hasFilters =
         filters.q !== '' ||
         filters.layanan !== 'semua' ||
-        filters.channel !== 'semua' ||
-        filters.pj !== 'semua';
+        filters.channel.length > 0 ||
+        filters.pj !== 'semua' ||
+        filters.periode !== 'semua';
 
     const reset = () => {
         setQuery('');
+        setChannelPick([]);
         setSelected(new Set());
         router.get(clients.url(), {}, { preserveScroll: true, replace: true });
     };
-
-    const acrossChannels = channels.reduce((sum, item) => sum + item.count, 0);
 
     return (
         <>
@@ -231,12 +262,31 @@ export default function Clients({
                         </p>
                     </div>
 
-                    <Button size="lg" className="shadow-teal" asChild>
-                        <Link href={addClient}>
-                            <Plus strokeWidth={2} aria-hidden />
-                            Tambah Client
-                        </Link>
-                    </Button>
+                    {/* The window sits up here, not in the toolbar: it scopes
+                        the figures below as well as the list. */}
+                    <div className="flex w-full flex-wrap items-center gap-2.5 sm:w-auto">
+                        <PeriodFilter
+                            period={period}
+                            options={PERIODS}
+                            heading="Menjadi client"
+                            months
+                            className="h-10 flex-1 sm:flex-none"
+                            onChange={(next) =>
+                                go({
+                                    periode: next.periode,
+                                    dari: next.dari ?? null,
+                                    sampai: next.sampai ?? null,
+                                })
+                            }
+                        />
+
+                        <Button size="lg" className="shadow-teal" asChild>
+                            <Link href={addClient}>
+                                <Plus strokeWidth={2} aria-hidden />
+                                Tambah Client
+                            </Link>
+                        </Button>
+                    </div>
                 </div>
 
                 <ClientLedger
@@ -245,31 +295,9 @@ export default function Clients({
                     onContracts={() => go({ urut: 'kontrak' })}
                 />
 
-                {/* Channel chips double as the read of where clients come from:
-                    the counts stay visible whichever one is chosen. */}
-                <div className="-mx-1 overflow-x-auto px-1 pb-1">
-                    <div className="flex min-w-max gap-2.5">
-                        <CountChip
-                            label="Semua channel"
-                            count={acrossChannels}
-                            active={filters.channel === 'semua'}
-                            onClick={() => go({ channel: 'semua' })}
-                        />
-                        {channels.map((channel) => (
-                            <CountChip
-                                key={channel.key}
-                                label={channel.label}
-                                count={channel.count}
-                                active={filters.channel === channel.key}
-                                onClick={() => go({ channel: channel.key })}
-                            />
-                        ))}
-                    </div>
-                </div>
-
                 {/* Container-less: every control carries its own edge. On a
                     phone the search takes the first row and the rest pair up. */}
-                <div className="-mt-2 grid grid-cols-2 gap-2.5 sm:flex sm:flex-wrap sm:items-center">
+                <div className="grid grid-cols-2 gap-2.5 sm:flex sm:flex-wrap sm:items-center">
                     <label className="col-span-2 flex min-w-0 items-center gap-2.5 rounded-md border border-border bg-card px-3.5 py-2.5 text-muted-foreground shadow-lift transition-[box-shadow,border-color] focus-within:border-primary/40 focus-within:ring-2 focus-within:ring-ring/40 sm:col-span-1 sm:max-w-xs sm:flex-1">
                         <Search
                             className="size-4 shrink-0"
@@ -285,6 +313,29 @@ export default function Clients({
                             className="min-w-0 flex-1 bg-transparent text-base text-foreground outline-none placeholder:text-muted-foreground sm:text-[0.8438rem]"
                         />
                     </label>
+
+                    {/* The channel list doubles as the read of where clients
+                        come from: its counts stay whole whichever are picked. */}
+                    <MultiFilterSelect
+                        label="Channel"
+                        allLabel="Semua channel"
+                        noun="channel"
+                        value={channelPick}
+                        onChange={(picked) => {
+                            setChannelPick(picked);
+                            go({ channel: picked.join(',') });
+                        }}
+                        options={channels.map((channel) => ({
+                            value: channel.key,
+                            label: channel.label,
+                            count: channel.count,
+                            icon: (
+                                <ChannelIcon
+                                    channel={channel.key as ChannelKey}
+                                />
+                            ),
+                        }))}
+                    />
 
                     <FilterSelect
                         label="Layanan"
@@ -326,7 +377,7 @@ export default function Clients({
                         <button
                             type="button"
                             onClick={reset}
-                            className="inline-flex items-center justify-center gap-1.5 rounded-md px-2 py-2.5 text-[0.8438rem] font-bold text-muted-foreground underline decoration-transparent underline-offset-4 transition-colors hover:text-destructive hover:decoration-current sm:justify-start"
+                            className="col-span-2 inline-flex items-center justify-center gap-1.5 rounded-md px-2 py-2.5 text-[0.8438rem] font-bold text-muted-foreground underline decoration-transparent underline-offset-4 transition-colors hover:text-destructive hover:decoration-current sm:justify-start"
                         >
                             <X
                                 className="size-3.5"
