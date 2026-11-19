@@ -2,7 +2,7 @@ import { cn } from '@/lib/utils';
 
 /**
  * A filter chip that carries its own count, so a row of them doubles as a
- * reading of the whole: stages on the Leads page, channels on the Client page.
+ * reading of the whole: stages on the Leads page, statuses on Letters.
  */
 export function CountChip({
     label,

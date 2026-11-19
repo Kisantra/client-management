@@ -21,14 +21,16 @@ use Illuminate\Support\Carbon;
 class Period
 {
     /**
-     * Every window either page offers, and what to call it.
+     * Every window any page offers, and what to call it.
      *
      * Content looks forwards as well as back — half its calendar has not
-     * happened yet — while the Instagram figures only ever look back, so each
-     * page is handed the subset that makes sense for it rather than one list
-     * with dead entries in it.
+     * happened yet — while the Instagram figures and the client list only ever
+     * look back, so each page is handed the subset that makes sense for it
+     * rather than one list with dead entries in it.
      */
     public const LABELS = [
+        'minggu-ini' => 'Minggu ini',
+        'minggu-lalu' => 'Minggu lalu',
         'bulan-ini' => 'Bulan ini',
         'bulan-lalu' => 'Bulan lalu',
         'bulan-depan' => 'Bulan depan',
@@ -76,7 +78,10 @@ class Period
 
         $today = Carbon::today();
 
+        // Weeks run Monday to Sunday, the way the team's calendar draws them.
         [$start, $end] = match ($key) {
+            'minggu-ini' => [$today->copy()->startOfWeek(Carbon::MONDAY), $today->copy()->endOfWeek(Carbon::SUNDAY)],
+            'minggu-lalu' => [$today->copy()->subWeek()->startOfWeek(Carbon::MONDAY), $today->copy()->subWeek()->endOfWeek(Carbon::SUNDAY)],
             'bulan-ini' => [$today->copy()->startOfMonth(), $today->copy()->endOfMonth()],
             'bulan-lalu' => [$today->copy()->subMonthNoOverflow()->startOfMonth(), $today->copy()->subMonthNoOverflow()->endOfMonth()],
             'bulan-depan' => [$today->copy()->addMonthNoOverflow()->startOfMonth(), $today->copy()->addMonthNoOverflow()->endOfMonth()],
@@ -109,7 +114,18 @@ class Period
             return self::LABELS[$this->key] ?? self::LABELS['semua'];
         }
 
+        // A range that is exactly one calendar month is named as that month.
+        if ($this->isWholeMonth()) {
+            return Dates::monthName($this->from->month).' '.$this->from->year;
+        }
+
         return Dates::range($this->from, $this->to);
+    }
+
+    private function isWholeMonth(): bool
+    {
+        return $this->from->isSameDay($this->from->copy()->startOfMonth())
+            && $this->to->isSameDay($this->from->copy()->endOfMonth());
     }
 
     /**

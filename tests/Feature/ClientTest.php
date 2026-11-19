@@ -311,6 +311,58 @@ it('filters by channel, person, service and search, and keeps the rails counting
         ->assertInertia(fn ($page) => $page->has('rows.data', 1));
 });
 
+it('narrows to the window each became a client in, and to several channels at once', function () {
+    // The 20th is a Thursday, so this week runs 17 to 23 August.
+    client(['company' => 'Minggu Ini', 'stage_changed_at' => '2026-08-18']);
+    client(['company' => 'Minggu Lalu', 'channel' => 'instagram', 'stage_changed_at' => '2026-08-12']);
+    client(['company' => 'Juli', 'channel' => 'whatsapp', 'stage_changed_at' => '2026-07-15']);
+
+    $this->get(route('clients', ['periode' => 'minggu-ini']))
+        ->assertInertia(fn ($page) => $page
+            ->where('period.key', 'minggu-ini')
+            ->where('period.label', 'Minggu ini')
+            ->has('rows.data', 1)
+            ->where('rows.data.0.company', 'PT Minggu Ini')
+            ->where('summary.count', 1)
+            // The page's own size is untouched, so the empty state stays honest.
+            ->where('total', 3)
+            // The channel counts are read inside the same window.
+            ->where('channels.0.key', 'instagram')
+            ->where('channels.0.count', 0)
+            ->where('channels.3.key', 'web')
+            ->where('channels.3.count', 1)
+        );
+
+    // A month picked by name is a custom range that covers exactly it.
+    $this->get(route('clients', ['periode' => 'khusus', 'dari' => '2026-07-01', 'sampai' => '2026-07-31']))
+        ->assertInertia(fn ($page) => $page
+            ->where('period.label', 'Juli 2026')
+            ->where('filters.periode', 'khusus')
+            ->where('filters.dari', '2026-07-01')
+            ->where('filters.sampai', '2026-07-31')
+            ->has('rows.data', 1)
+            ->where('rows.data.0.company', 'PT Juli')
+        );
+
+    // Kept in the pipeline's order, and an unknown key is dropped, not fatal.
+    $this->get(route('clients', ['channel' => 'whatsapp,instagram,bukan-channel']))
+        ->assertInertia(fn ($page) => $page
+            ->where('filters.channel', ['instagram', 'whatsapp'])
+            ->has('rows.data', 2)
+            ->where('summary.count', 2)
+            // Picking channels never hides the size of the ones not picked.
+            ->where('channels.3.count', 1)
+        );
+
+    $this->get(route('clients'))
+        ->assertInertia(fn ($page) => $page
+            ->where('filters.channel', [])
+            ->where('period.key', 'semua')
+            ->where('filters.dari', '')
+            ->has('rows.data', 3)
+        );
+});
+
 it('tells an empty result from having no clients at all', function () {
     $this->get(route('clients'))
         ->assertInertia(fn ($page) => $page

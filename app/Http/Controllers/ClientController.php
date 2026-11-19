@@ -4,6 +4,7 @@ namespace App\Http\Controllers;
 
 use App\Models\Lead;
 use App\Support\Attachments;
+use App\Support\Period;
 use App\Support\Pipeline;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Http\RedirectResponse;
@@ -44,6 +45,15 @@ class ClientController extends Controller
     /** Days before its end that a contract counts as running out. */
     private const ENDING_SOON_DAYS = 30;
 
+    /**
+     * The windows the list can be narrowed to, by the day each became a
+     * client. Only backwards: nobody becomes a client next month yet.
+     */
+    private const PERIODS = [
+        'minggu-ini', 'minggu-lalu', 'bulan-ini', 'bulan-lalu',
+        'kuartal', 'tahun', '30hari', '90hari', 'semua', 'khusus',
+    ];
+
     private const MONTHS = [
         'Jan', 'Feb', 'Mar', 'Apr', 'Mei', 'Jun',
         'Jul', 'Agu', 'Sep', 'Okt', 'Nov', 'Des',
@@ -51,12 +61,21 @@ class ClientController extends Controller
 
     public function index(Request $request): Response
     {
-        $filters = $this->filters($request);
+        $period = Period::from(
+            (string) $request->query('periode', 'semua'),
+            $request->query('dari'),
+            $request->query('sampai'),
+            self::PERIODS,
+            'semua',
+        );
 
-        $matching = $this->matching($filters);
+        $filters = $this->filters($request, $period);
+
+        $matching = $this->matching($filters, $period);
 
         return Inertia::render('clients', [
             'filters' => $filters,
+            'period' => $period->toArray(),
             'total' => $this->base()->count(),
             'endingSoonDays' => self::ENDING_SOON_DAYS,
             'summary' => $this->summary(clone $matching),
@@ -64,8 +83,8 @@ class ClientController extends Controller
              | The rails count under every filter except their own, so picking
              | a channel or a person never hides the size of the ones not picked.
              */
-            'channels' => $this->channels($this->matching($filters, except: 'channel')),
-            'owners' => $this->owners($this->matching($filters, except: 'pj')),
+            'channels' => $this->channels($this->matching($filters, $period, except: 'channel')),
+            'owners' => $this->owners($this->matching($filters, $period, except: 'pj')),
             'sources' => $this->sources(clone $matching),
             'services' => $this->base()->distinct()->orderBy('service')->pluck('service')->all(),
             'rows' => $this->page(clone $matching, $filters),
@@ -119,11 +138,10 @@ class ClientController extends Controller
     /**
      * The filters the list is read through, normalised and safe to trust.
      *
-     * @return array{q: string, layanan: string, channel: string, pj: string, urut: string}
+     * @return array{q: string, layanan: string, channel: array<int, string>, pj: string, urut: string, periode: string, dari: string, sampai: string}
      */
-    private function filters(Request $request): array
+    private function filters(Request $request, Period $period): array
     {
-        $channels = array_keys(Pipeline::channels());
         $sorts = ['sejak', 'kontrak', 'nilai', 'nama'];
 
         $pick = function (string $key) use ($request): string {
@@ -132,16 +150,33 @@ class ClientController extends Controller
             return $value === '' ? 'semua' : $value;
         };
 
-        $channel = (string) $request->query('channel', 'semua');
         $urut = (string) $request->query('urut', 'sejak');
+        $custom = $period->key === 'khusus';
 
         return [
             'q' => trim((string) $request->query('q', '')),
             'layanan' => $pick('layanan'),
-            'channel' => in_array($channel, $channels, true) ? $channel : 'semua',
+            'channel' => $this->pickedChannels($request->query('channel')),
             'pj' => $pick('pj'),
             'urut' => in_array($urut, $sorts, true) ? $urut : 'sejak',
+            'periode' => $period->key,
+            'dari' => $custom ? $period->from->toDateString() : '',
+            'sampai' => $custom ? $period->to->toDateString() : '',
         ];
+    }
+
+    /**
+     * The channels picked, in the order the pipeline lists them; empty means
+     * every channel. Arrives comma-separated (`instagram,whatsapp`), and an
+     * unknown key is dropped rather than emptying the list.
+     *
+     * @return array<int, string>
+     */
+    private function pickedChannels(mixed $value): array
+    {
+        $asked = is_array($value) ? $value : explode(',', (string) $value);
+
+        return array_values(array_intersect(array_keys(Pipeline::channels()), $asked));
     }
 
     /** @return Builder<Lead> */
@@ -153,15 +188,22 @@ class ClientController extends Controller
     /**
      * Every filter but the one named, which a rail needs left open.
      *
-     * @param  array<string, string>  $filters
+     * The period is read against the day each became a client — the same
+     * date the list sorts by and shows as "Client sejak".
+     *
+     * @param  array<string, mixed>  $filters
      * @return Builder<Lead>
      */
-    private function matching(array $filters, ?string $except = null): Builder
+    private function matching(array $filters, Period $period, ?string $except = null): Builder
     {
         return $this->base()
             ->when(
-                $except !== 'channel' && $filters['channel'] !== 'semua',
-                fn (Builder $query) => $query->where('channel', $filters['channel']),
+                ! $period->isOpen(),
+                fn (Builder $query) => $query->whereBetween('stage_changed_at', $period->bounds()),
+            )
+            ->when(
+                $except !== 'channel' && $filters['channel'] !== [],
+                fn (Builder $query) => $query->whereIn('channel', $filters['channel']),
             )
             ->when(
                 $except !== 'pj' && $filters['pj'] !== 'semua',
@@ -347,7 +389,7 @@ class ClientController extends Controller
 
     /**
      * @param  Builder<Lead>  $query
-     * @param  array<string, string>  $filters
+     * @param  array<string, mixed>  $filters
      * @return array<string, mixed>
      */
     private function page(Builder $query, array $filters): array

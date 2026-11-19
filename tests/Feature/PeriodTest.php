@@ -6,9 +6,9 @@ use Illuminate\Support\Carbon;
 beforeEach(fn () => Carbon::setTestNow('2026-08-20'));
 afterEach(fn () => Carbon::setTestNow());
 
-/** Every window either page offers. */
+/** Every window any page offers. */
 const OFFERED = [
-    'bulan-ini', 'bulan-lalu', 'bulan-depan', 'kuartal', 'tahun',
+    'minggu-ini', 'minggu-lalu', 'bulan-ini', 'bulan-lalu', 'bulan-depan', 'kuartal', 'tahun',
     '30hari', '90hari', '6bulan', 'semua', 'khusus',
 ];
 
@@ -23,6 +23,9 @@ it('resolves every named window against today', function (string $key, string $f
     expect($period->from?->toDateString())->toBe($from)
         ->and($period->to?->toDateString())->toBe($to);
 })->with([
+    // The 20th is a Thursday; weeks run Monday to Sunday.
+    ['minggu-ini', '2026-08-17', '2026-08-23'],
+    ['minggu-lalu', '2026-08-10', '2026-08-16'],
     ['bulan-ini', '2026-08-01', '2026-08-31'],
     ['bulan-lalu', '2026-07-01', '2026-07-31'],
     ['bulan-depan', '2026-09-01', '2026-09-30'],
@@ -63,6 +66,12 @@ it('takes a custom range and names it by its dates', function () {
     expect(window('khusus', '2026-08-04', '2026-08-28')->label())->toBe('4 – 28 Agu 2026')
         ->and(window('khusus', '2025-12-28', '2026-01-04')->label())->toBe('28 Des 2025 – 4 Jan 2026')
         ->and(window('khusus', '2026-08-04', '2026-08-04')->label())->toBe('4 Agu 2026');
+
+    // Exactly one calendar month is named as that month; a day short is not.
+    expect(window('khusus', '2026-08-01', '2026-08-31')->label())->toBe('Agustus 2026')
+        ->and(window('khusus', '2026-02-01', '2026-02-28')->label())->toBe('Februari 2026')
+        ->and(window('khusus', '2026-08-01', '2026-08-30')->label())->toBe('1 – 30 Agu 2026')
+        ->and(window('khusus', '2026-07-01', '2026-08-31')->label())->toBe('1 Jul – 31 Agu 2026');
 });
 
 it('falls back to the default rather than to nothing', function () {
