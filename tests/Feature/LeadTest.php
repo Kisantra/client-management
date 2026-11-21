@@ -5,8 +5,11 @@ use App\Models\LeadFollowUp;
 use App\Models\User;
 use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Carbon;
+use Illuminate\Support\Facades\Exceptions;
 use Illuminate\Support\Facades\Storage;
 use Inertia\Inertia;
+use League\Flysystem\UnableToCreateDirectory;
+use League\Flysystem\UnableToWriteFile;
 
 beforeEach(function () {
     $this->actingAs(User::factory()->create(['name' => 'Admin']));
@@ -181,6 +184,56 @@ it('accepts a gated stage move that carries its document', function () {
         ->toBe(Carbon::today()->addDays(21)->toDateString())
         ->and($lead->stageEvents->last()->stage)->toBe('proposal')
         ->and($lead->notes->first()->attachments)->toHaveCount(1);
+});
+
+it('keeps the lead where it was when the server cannot store its document', function () {
+    Exceptions::fake();
+    $lead = lead();
+    $events = $lead->stageEvents()->count();
+
+    // As on the server: leads/ belongs to another user, so the website cannot
+    // create this lead's folder inside it (Watchpost #14).
+    $leads = Storage::disk('local')->path('leads');
+    mkdir($leads, 0500, true);
+
+    try {
+        $this->post(route('leads.stage.store', $lead), [
+            'stage' => 'proposal',
+            'files' => [UploadedFile::fake()->create('proposal.pdf', 120, 'application/pdf')],
+        ])->assertSessionHasErrors(['files' => 'Lampiran tidak bisa disimpan di server. Tim teknis sudah diberi tahu, coba lagi nanti.']);
+    } finally {
+        chmod($leads, 0700);
+    }
+
+    expect($lead->fresh()->stage)->toBe('lead')
+        ->and($lead->stageEvents()->count())->toBe($events)
+        ->and($lead->notes()->count())->toBe(0)
+        ->and($lead->attachments()->count())->toBe(0);
+
+    Exceptions::assertReported(UnableToCreateDirectory::class);
+});
+
+it('turns a note down when the lead folder exists but cannot be written', function () {
+    Exceptions::fake();
+    $lead = lead();
+
+    $folder = Storage::disk('local')->path('leads/'.$lead->id);
+    mkdir($folder, 0700, true);
+    chmod($folder, 0500);
+
+    try {
+        $this->post(route('leads.notes.store', $lead), [
+            'body' => 'Kartu nama terlampir.',
+            'files' => [UploadedFile::fake()->image('kartu-nama.png')],
+        ])->assertSessionHasErrors('files');
+    } finally {
+        chmod($folder, 0700);
+    }
+
+    expect($lead->notes()->count())->toBe(0)
+        ->and($lead->attachments()->count())->toBe(0);
+
+    Exceptions::assertReported(UnableToWriteFile::class);
 });
 
 it('moves through an ungated stage without a document', function () {
