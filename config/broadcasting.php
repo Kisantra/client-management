@@ -1,5 +1,10 @@
 <?php
 
+// Port 443 only speaks TLS. Behind Cloudflare, plain http there is answered
+// "400 The plain HTTP request was sent to HTTPS port" and the broadcast is
+// lost (Watchpost #4), so REVERB_SCHEME=http does not apply to it.
+$reverbScheme = (int) env('REVERB_PORT', 443) === 443 ? 'https' : env('REVERB_SCHEME', 'https');
+
 return [
 
     /*
@@ -38,8 +43,8 @@ return [
             'options' => [
                 'host' => env('REVERB_HOST'),
                 'port' => env('REVERB_PORT', 443),
-                'scheme' => env('REVERB_SCHEME', 'https'),
-                'useTLS' => env('REVERB_SCHEME', 'https') === 'https',
+                'scheme' => $reverbScheme,
+                'useTLS' => $reverbScheme === 'https',
             ],
             'client_options' => [
                 // Guzzle client options: https://docs.guzzlephp.org/en/stable/request-options.html
